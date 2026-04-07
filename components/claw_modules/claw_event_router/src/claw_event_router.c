@@ -779,6 +779,10 @@ static esp_err_t claw_event_router_write_rules_json_file(const char *path, const
     }
     fclose(file);
 
+    if (remove(path) != 0 && errno != ENOENT) {
+        remove(temp_path);
+        return ESP_FAIL;
+    }
     if (rename(temp_path, path) != 0) {
         remove(temp_path);
         return ESP_FAIL;

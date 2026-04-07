@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "main.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        claw_event_router
+        console
+        fatfs
+        json
+        nvs_flash
+        wear_levelling
+)
