@@ -38,7 +38,7 @@
 #include "esp_log.h"
 #include "freertos/task.h"
 
-static const char *TAG = "app_clawgent";
+static const char *TAG = "app_esp_claw";
 static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "cap_cli",
     "cap_files",
@@ -49,7 +49,7 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
 #define BASIC_DEMO_IM_ATTACHMENT_MAX_BYTES (2 * 1024 * 1024)
 
 #define BASIC_DEMO_SYSTEM_PROMPT \
-    "You are the clawgent running on ESP32. " \
+    "You are the ESP-Claw running on ESP32. " \
     "Answer briefly and plainly. " \
     "Treat Skills List as a catalog of optional skills, not as callable cap. " \
     "Use 'activate_skill' to load a skill,and you will gain more callable capabilities\n" \
