@@ -4,7 +4,7 @@
       "id": "cap_im_wechat",
       "file": "cap_im_wechat.md",
       "title": "cap_im_wechat",
-      "summary": "How to send text and images through WeChat capabilities.",
+      "summary": "How to send additional text and images to WeChat.",
       "cap_groups": [
         "cap_im_wechat"
       ]

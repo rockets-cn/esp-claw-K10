@@ -12,7 +12,6 @@
 
 #include "basic_demo_lua_modules.h"
 #include "basic_demo_wifi.h"
-#include "cap_cli.h"
 #include "cap_files.h"
 #include "cap_im_feishu.h"
 #include "cap_im_qq.h"
@@ -49,9 +48,7 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
 };
 #else
 static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
-    "cap_cli",
     "cap_files",
-    "cap_router_mgr",
     "cap_skill",
 };
 #endif
@@ -61,8 +58,8 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
 #define BASIC_DEMO_SYSTEM_PROMPT_COMMON \
     "You are the ESP-Claw running on ESP32. " \
     "Answer briefly and plainly. " \
-    "Treat Skills List as a catalog of optional skills, not as callable cap. " \
-    "Use 'activate_skill' to load a skill,and you will gain more callable capabilities\n" \
+    "Treat Skills List as a catalog of optional skills." \
+    "Use 'activate_skill' to load a skill, and you will gain more callable capabilities\n" \
     "Skills are user-facing functions, while Capabilities are internal functions used by the model.\n" \
     "After completing the task, call 'deactivete_skill' to keep the context streamlined and efficient." \
     "When communicating with the user, refer to skills instead of Capabilities. " \

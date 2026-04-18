@@ -765,7 +765,8 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .family = "skill",
         .description = "List all registered skills from skills_list",
         .kind = CLAW_CAP_KIND_CALLABLE,
-        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
+        /* The skills catalog is already injected into prompt context, so keep this for non-LLM callers only. */
+        .cap_flags = 0,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{}}",
         .execute = cap_skill_list_execute,
     },
@@ -795,7 +796,7 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "activate_skill",
         .name = "activate_skill",
         .family = "skill",
-        .description = "Activate a skill by skill_id for the current session and load its skill documentation into the prompt.",
+        .description = "Activate a skill and load its skill documentation into the prompt.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =
@@ -806,7 +807,7 @@ static const claw_cap_descriptor_t s_skill_descriptors[] = {
         .id = "deactivate_skill",
         .name = "deactivate_skill",
         .family = "skill",
-        .description = "Deactivate one skill by skill_id, or use all to clear active skills and remove their skill documentation from the prompt for the current session.",
+        .description = "Deactivate one skill by skill_id, or use all to clear active skills and remove their skill documentation from the prompt.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json =

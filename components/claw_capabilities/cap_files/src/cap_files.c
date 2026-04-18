@@ -324,136 +324,6 @@ static esp_err_t cap_files_write_file_execute(const char *input_json,
     return ESP_OK;
 }
 
-static esp_err_t cap_files_edit_file_execute(const char *input_json,
-                                             const claw_cap_call_context_t *ctx,
-                                             char *output,
-                                             size_t output_size)
-{
-    cJSON *root = NULL;
-    const char *path = NULL;
-    const char *old_string = NULL;
-    const char *new_string = NULL;
-    char resolved_path[256];
-    FILE *file = NULL;
-    long file_size;
-    char *buffer = NULL;
-    char *result = NULL;
-    char *match = NULL;
-    size_t old_len;
-    size_t new_len;
-    size_t prefix_len;
-    size_t suffix_start;
-    size_t suffix_len;
-    size_t total_len;
-
-    (void)ctx;
-
-    root = cJSON_Parse(input_json);
-    if (!root) {
-        snprintf(output, output_size, "Error: invalid JSON input");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    path = cJSON_GetStringValue(cJSON_GetObjectItem(root, "path"));
-    old_string = cJSON_GetStringValue(cJSON_GetObjectItem(root, "old_string"));
-    new_string = cJSON_GetStringValue(cJSON_GetObjectItem(root, "new_string"));
-    if (cap_files_resolve_path(path, resolved_path, sizeof(resolved_path)) != ESP_OK) {
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: path must stay under %s", s_files_base_dir);
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (!old_string || !new_string) {
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: missing old_string or new_string");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    file = fopen(resolved_path, "rb");
-    if (!file) {
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: file not found: %s", resolved_path);
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    fseek(file, 0, SEEK_END);
-    file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    if (file_size <= 0 || file_size > CAP_FILES_MAX_FILE_SIZE) {
-        fclose(file);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: file too large or empty (%ld bytes)", file_size);
-        return ESP_ERR_INVALID_SIZE;
-    }
-
-    buffer = calloc(1, (size_t)file_size + 1);
-    if (!buffer) {
-        fclose(file);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: out of memory");
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (fread(buffer, 1, (size_t)file_size, file) != (size_t)file_size) {
-        free(buffer);
-        fclose(file);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: failed to read %s", resolved_path);
-        return ESP_FAIL;
-    }
-    fclose(file);
-
-    match = strstr(buffer, old_string);
-    if (!match) {
-        free(buffer);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: old_string not found in %s", resolved_path);
-        return ESP_ERR_NOT_FOUND;
-    }
-
-    old_len = strlen(old_string);
-    new_len = strlen(new_string);
-    prefix_len = (size_t)(match - buffer);
-    suffix_start = prefix_len + old_len;
-    suffix_len = (size_t)file_size - suffix_start;
-    total_len = prefix_len + new_len + suffix_len;
-
-    result = malloc(total_len + 1);
-    if (!result) {
-        free(buffer);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: out of memory");
-        return ESP_ERR_NO_MEM;
-    }
-
-    memcpy(result, buffer, prefix_len);
-    memcpy(result + prefix_len, new_string, new_len);
-    memcpy(result + prefix_len + new_len, buffer + suffix_start, suffix_len);
-    result[total_len] = '\0';
-    free(buffer);
-
-    file = fopen(resolved_path, "wb");
-    if (!file) {
-        free(result);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: cannot open file for writing: %s", resolved_path);
-        return ESP_FAIL;
-    }
-
-    if (fwrite(result, 1, total_len, file) != total_len) {
-        fclose(file);
-        free(result);
-        cJSON_Delete(root);
-        snprintf(output, output_size, "Error: failed to write %s", resolved_path);
-        return ESP_FAIL;
-    }
-
-    fclose(file);
-    free(result);
-    cJSON_Delete(root);
-    snprintf(output, output_size, "OK: edited %s", resolved_path);
-    return ESP_OK;
-}
-
 static esp_err_t cap_files_delete_file_execute(const char *input_json,
                                                const claw_cap_call_context_t *ctx,
                                                char *output,
@@ -550,7 +420,7 @@ static const claw_cap_descriptor_t s_files_descriptors[] = {
         .id = "read_file",
         .name = "read_file",
         .family = "files",
-        .description = "Read a UTF-8 text file under the managed FATFS base directory.",
+        .description = "Read a text file.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}",
@@ -560,27 +430,17 @@ static const claw_cap_descriptor_t s_files_descriptors[] = {
         .id = "write_file",
         .name = "write_file",
         .family = "files",
-        .description = "Create or overwrite a text file under the managed FATFS base directory.",
+        .description = "Create or overwrite a text file",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"path\",\"content\"]}",
         .execute = cap_files_write_file_execute,
     },
     {
-        .id = "edit_file",
-        .name = "edit_file",
-        .family = "files",
-        .description = "Replace the first matching string inside a text file under the managed FATFS base directory.",
-        .kind = CLAW_CAP_KIND_CALLABLE,
-        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
-        .input_schema_json = "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"},\"old_string\":{\"type\":\"string\"},\"new_string\":{\"type\":\"string\"}},\"required\":[\"path\",\"old_string\",\"new_string\"]}",
-        .execute = cap_files_edit_file_execute,
-    },
-    {
         .id = "delete_file",
         .name = "delete_file",
         .family = "files",
-        .description = "Delete a file under the managed FATFS base directory.",
+        .description = "Delete a file.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}",
@@ -590,7 +450,7 @@ static const claw_cap_descriptor_t s_files_descriptors[] = {
         .id = "list_dir",
         .name = "list_dir",
         .family = "files",
-        .description = "Recursively list files under the managed FATFS base directory, optionally filtered by prefix.",
+        .description = "Recursively list files, optionally filtered by prefix.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"prefix\":{\"type\":\"string\"}}}",
