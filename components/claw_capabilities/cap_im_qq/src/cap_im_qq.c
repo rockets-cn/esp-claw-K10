@@ -98,6 +98,13 @@ typedef struct {
 } cap_im_qq_inbound_frame_t;
 
 typedef struct {
+    char *buf;
+    size_t len;
+    size_t cap;
+    int payload_len;
+} cap_im_qq_ws_assembly_t;
+
+typedef struct {
     char app_id[64];
     char app_secret[128];
     char access_token[512];
@@ -116,6 +123,7 @@ typedef struct {
     volatile bool ws_identify_pending;
     volatile bool ws_should_reconnect;
     volatile bool stop_requested;
+    cap_im_qq_ws_assembly_t ws_assembly;
     uint64_t seen_msg_keys[CAP_IM_QQ_DEDUP_CACHE_SIZE];
     size_t seen_msg_idx;
 } cap_im_qq_state_t;
@@ -184,6 +192,99 @@ static const char *cap_im_qq_basename(const char *path)
 static bool cap_im_qq_is_image_mime(const char *mime)
 {
     return mime && strncmp(mime, "image/", 6) == 0;
+}
+
+static bool cap_im_qq_is_audio_mime(const char *mime)
+{
+    return mime && strncmp(mime, "audio/", 6) == 0;
+}
+
+static void cap_im_qq_reset_ws_assembly(void)
+{
+    free(s_qq.ws_assembly.buf);
+    s_qq.ws_assembly.buf = NULL;
+    s_qq.ws_assembly.len = 0;
+    s_qq.ws_assembly.cap = 0;
+    s_qq.ws_assembly.payload_len = 0;
+}
+
+static esp_err_t cap_im_qq_queue_inbound_frame(const char *frame, size_t frame_len)
+{
+    cap_im_qq_inbound_frame_t item = {0};
+
+    if (!frame || frame_len == 0 || !s_qq.inbound_queue) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    item.frame = calloc(1, frame_len + 1);
+    if (!item.frame) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    memcpy(item.frame, frame, frame_len);
+    item.len = frame_len;
+    if (xQueueSend(s_qq.inbound_queue, &item, 0) != pdTRUE) {
+        free(item.frame);
+        return ESP_ERR_NO_MEM;
+    }
+
+    return ESP_OK;
+}
+
+static esp_err_t cap_im_qq_handle_inbound_ws_data(const esp_websocket_event_data_t *event)
+{
+    size_t needed = 0;
+
+    if (!event || event->op_code != 0x01 || !event->data_ptr || event->data_len <= 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_qq.inbound_queue) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (event->payload_len <= 0 ||
+            (event->payload_offset == 0 && event->payload_len == event->data_len)) {
+        return cap_im_qq_queue_inbound_frame(event->data_ptr, (size_t)event->data_len);
+    }
+
+    if (event->payload_offset == 0) {
+        needed = (size_t)event->payload_len + 1;
+        if (needed > s_qq.ws_assembly.cap) {
+            char *tmp = realloc(s_qq.ws_assembly.buf, needed);
+
+            if (!tmp) {
+                cap_im_qq_reset_ws_assembly();
+                return ESP_ERR_NO_MEM;
+            }
+            s_qq.ws_assembly.buf = tmp;
+            s_qq.ws_assembly.cap = needed;
+        }
+        s_qq.ws_assembly.len = 0;
+        s_qq.ws_assembly.payload_len = event->payload_len;
+    } else if (!s_qq.ws_assembly.buf ||
+               s_qq.ws_assembly.payload_len != event->payload_len ||
+               s_qq.ws_assembly.len != (size_t)event->payload_offset) {
+        cap_im_qq_reset_ws_assembly();
+        return ESP_FAIL;
+    }
+
+    memcpy(s_qq.ws_assembly.buf + s_qq.ws_assembly.len, event->data_ptr, (size_t)event->data_len);
+    s_qq.ws_assembly.len += (size_t)event->data_len;
+    s_qq.ws_assembly.buf[s_qq.ws_assembly.len] = '\0';
+    if ((int)s_qq.ws_assembly.len < s_qq.ws_assembly.payload_len) {
+        return ESP_OK;
+    }
+    if ((int)s_qq.ws_assembly.len != s_qq.ws_assembly.payload_len) {
+        cap_im_qq_reset_ws_assembly();
+        return ESP_FAIL;
+    }
+
+    {
+        esp_err_t err = cap_im_qq_queue_inbound_frame(s_qq.ws_assembly.buf, s_qq.ws_assembly.len);
+
+        cap_im_qq_reset_ws_assembly();
+        return err;
+    }
 }
 
 static esp_err_t cap_im_qq_http_event_handler(esp_http_client_event_t *event)
@@ -741,6 +842,8 @@ static void cap_im_qq_handle_attachments(cJSON *attachments,
         }
         if (cap_im_qq_is_image_mime(mime)) {
             kind = "image";
+        } else if (cap_im_qq_is_audio_mime(mime)) {
+            kind = "file";
         }
 
         {
@@ -762,13 +865,65 @@ static void cap_im_qq_handle_attachments(cJSON *attachments,
     }
 }
 
+static void cap_im_qq_handle_attachment_field(cJSON *field,
+                                              const char *chat_id,
+                                              const char *sender_id,
+                                              const char *message_id)
+{
+    if (cJSON_IsArray(field)) {
+        cap_im_qq_handle_attachments(field, chat_id, sender_id, message_id);
+    } else if (cJSON_IsObject(field)) {
+        cJSON *array = cJSON_CreateArray();
+
+        if (!array) {
+            return;
+        }
+        cJSON_AddItemReferenceToArray(array, field);
+        cap_im_qq_handle_attachments(array, chat_id, sender_id, message_id);
+        cJSON_Delete(array);
+    }
+}
+
+static void cap_im_qq_handle_all_media(cJSON *data,
+                                       const char *chat_id,
+                                       const char *sender_id,
+                                       const char *message_id)
+{
+    static const char *const media_fields[] = {
+        "attachments",
+        "audio",
+        "audios",
+        "voice",
+        "voices",
+        "record",
+        "records",
+        "file",
+        "files",
+        "video",
+        "videos",
+    };
+    size_t i;
+
+    if (!cJSON_IsObject(data)) {
+        return;
+    }
+
+    for (i = 0; i < sizeof(media_fields) / sizeof(media_fields[0]); i++) {
+        cJSON *field = cJSON_GetObjectItem(data, media_fields[i]);
+
+        if (!field) {
+            continue;
+        }
+        cap_im_qq_handle_attachment_field(field, chat_id, sender_id, message_id);
+    }
+}
+
 static void cap_im_qq_handle_dispatch(cJSON *data, const char *event_type)
 {
     char chat_id[96] = {0};
     char sender_id[96] = {0};
     const char *content = NULL;
     const char *message_id = NULL;
-    cJSON *attachments = NULL;
 
     if (!data || !event_type) {
         return;
@@ -787,7 +942,6 @@ static void cap_im_qq_handle_dispatch(cJSON *data, const char *event_type)
         strlcpy(sender_id, openid->valuestring, sizeof(sender_id));
         content = cJSON_IsString(content_json) ? content_json->valuestring : "";
         message_id = id_json->valuestring;
-        attachments = cJSON_GetObjectItem(data, "attachments");
     } else if (strcmp(event_type, "GROUP_AT_MESSAGE_CREATE") == 0) {
         cJSON *group = cJSON_GetObjectItem(data, "group_openid");
         cJSON *author = cJSON_GetObjectItem(data, "author");
@@ -804,7 +958,6 @@ static void cap_im_qq_handle_dispatch(cJSON *data, const char *event_type)
         }
         content = cJSON_IsString(content_json) ? content_json->valuestring : "";
         message_id = id_json->valuestring;
-        attachments = cJSON_GetObjectItem(data, "attachments");
     } else {
         ESP_LOGI(TAG, "QQ dispatch type %s is not handled", event_type);
         return;
@@ -814,7 +967,7 @@ static void cap_im_qq_handle_dispatch(cJSON *data, const char *event_type)
         return;
     }
 
-    cap_im_qq_handle_attachments(attachments, chat_id, sender_id, message_id);
+    cap_im_qq_handle_all_media(data, chat_id, sender_id, message_id);
 
     if (content && content[0]) {
         if (cap_im_qq_publish_inbound_text(chat_id, sender_id, message_id, content) == ESP_OK) {
@@ -942,21 +1095,15 @@ static void cap_im_qq_ws_event_handler(void *arg,
     }
 
     if (s_qq.inbound_queue) {
-        cap_im_qq_inbound_frame_t item = {
-            .frame = calloc(1, (size_t)event->data_len + 1),
-            .len = (size_t)event->data_len,
-        };
+        esp_err_t err = cap_im_qq_handle_inbound_ws_data(event);
 
-        if (!item.frame) {
-            ESP_LOGW(TAG, "QQ inbound queue alloc failed len=%d", event->data_len);
-            return;
-        }
-
-        memcpy(item.frame, event->data_ptr, item.len);
-        if (xQueueSend(s_qq.inbound_queue, &item, 0) != pdTRUE) {
-            ESP_LOGW(TAG, "QQ inbound queue full, dropping frame len=%d", event->data_len);
-            free(item.frame);
-        } else {
+        if (err != ESP_OK && err != ESP_ERR_INVALID_ARG) {
+            ESP_LOGW(TAG,
+                     "QQ inbound WS frame handling failed len=%d payload_len=%d offset=%d err=%s",
+                     event->data_len,
+                     event->payload_len,
+                     event->payload_offset,
+                     esp_err_to_name(err));
         }
     }
 }
@@ -1498,6 +1645,7 @@ static void cap_im_qq_ws_task(void *arg)
 
 static void cap_im_qq_reset_runtime_state(void)
 {
+    cap_im_qq_reset_ws_assembly();
     s_qq.ws_client = NULL;
     s_qq.ws_task = NULL;
     s_qq.inbound_task = NULL;

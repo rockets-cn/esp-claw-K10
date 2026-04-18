@@ -26,7 +26,6 @@ static const char *SKILLS_LIST_FILE = "skills_list.json";
 typedef struct {
     char *id;
     char *file;
-    char *title;
     char *summary;
     char **cap_groups;
     size_t cap_group_count;
@@ -113,7 +112,6 @@ static void free_registry_entry(claw_skill_registry_entry_t *entry)
 
     free(entry->id);
     free(entry->file);
-    free(entry->title);
     free(entry->summary);
     free_string_array(entry->cap_groups, entry->cap_group_count);
     memset(entry, 0, sizeof(*entry));
@@ -456,7 +454,7 @@ static esp_err_t validate_registry_entry(claw_skill_registry_entry_t *entry)
     FILE *file = NULL;
     size_t i;
 
-    if (!entry || !entry->id || !entry->file || !entry->title || !entry->summary) {
+    if (!entry || !entry->id || !entry->file || !entry->summary) {
         return ESP_ERR_INVALID_ARG;
     }
     if (!skill_path_is_valid(entry->file) || !is_markdown_skill_file(entry->file)) {
@@ -542,9 +540,6 @@ static esp_err_t load_registry_from_json(void)
         err = json_dup_required_string(skill, "id", &entry->id);
         if (err == ESP_OK) {
             err = json_dup_required_string(skill, "file", &entry->file);
-        }
-        if (err == ESP_OK) {
-            err = json_dup_required_string(skill, "title", &entry->title);
         }
         if (err == ESP_OK) {
             err = json_dup_required_string(skill, "summary", &entry->summary);
@@ -746,8 +741,7 @@ static esp_err_t claw_skill_render_skills_list(char *buf, size_t size)
 
         off += snprintf(buf + off,
                         size - off,
-                        "- %s (%s): %s\n",
-                        entry->title,
+                        "- %s: %s\n",
                         entry->id,
                         entry->summary);
     }
@@ -792,7 +786,7 @@ static esp_err_t claw_skill_build_prompt_block(const char *const *skill_ids,
                         size - off,
                         "%s### %s\n%s\n",
                         i == 0 ? "" : "\n",
-                        entry->title,
+                        entry->id,
                         content);
         free(content);
     }
@@ -1024,7 +1018,6 @@ static esp_err_t claw_skill_skills_list_collect(const claw_core_request_t *reque
 
     content_size = 64;
     for (size_t i = 0; i < s_skill.entry_count; i++) {
-        content_size += strlen(s_skill.entries[i].title ? s_skill.entries[i].title : "");
         content_size += strlen(s_skill.entries[i].id ? s_skill.entries[i].id : "");
         content_size += strlen(s_skill.entries[i].summary ? s_skill.entries[i].summary : "");
         content_size += 16;

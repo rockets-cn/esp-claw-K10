@@ -352,6 +352,11 @@ static esp_err_t build_response_payload_json(const claw_core_request_t *request,
         cJSON_Delete(root);
         return ESP_ERR_NO_MEM;
     }
+    if (response->error_message && response->error_message[0] &&
+            !cJSON_AddStringToObject(root, "error_message", response->error_message)) {
+        cJSON_Delete(root);
+        return ESP_ERR_NO_MEM;
+    }
 
     payload_json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -363,24 +368,55 @@ static esp_err_t build_response_payload_json(const claw_core_request_t *request,
     return ESP_OK;
 }
 
-static esp_err_t build_agent_response_event(const claw_core_request_t *request,
-                                            const claw_core_response_t *response,
-                                            claw_event_t *out_event,
-                                            char **out_payload_json)
+static esp_err_t build_out_message_event_common(const char *event_id_prefix,
+                                                uint32_t request_id,
+                                                int64_t now_ms,
+                                                const char *channel,
+                                                const char *chat_id,
+                                                const char *text,
+                                                claw_event_t *out_event)
 {
-    const char *channel = NULL;
-    const char *chat_id = NULL;
-    int64_t now_ms;
-    esp_err_t err;
-
-    if (!request || !response || !out_event || !out_payload_json ||
-            response->status != CLAW_CORE_RESPONSE_STATUS_OK ||
-            !response->text || !response->text[0]) {
+    if (!event_id_prefix || !event_id_prefix[0] || !channel || !channel[0] ||
+            !chat_id || !chat_id[0] || !text || !text[0] || !out_event) {
         return ESP_ERR_INVALID_ARG;
     }
 
     memset(out_event, 0, sizeof(*out_event));
+    snprintf(out_event->event_id, sizeof(out_event->event_id),
+             "%s-%" PRIu32 "-%" PRId64, event_id_prefix, request_id, now_ms);
+    strlcpy(out_event->source_cap, "claw_core", sizeof(out_event->source_cap));
+    strlcpy(out_event->event_type, "out_message", sizeof(out_event->event_type));
+    strlcpy(out_event->source_channel, channel, sizeof(out_event->source_channel));
+    strlcpy(out_event->chat_id, chat_id, sizeof(out_event->chat_id));
+    strlcpy(out_event->content_type, "text", sizeof(out_event->content_type));
+    out_event->text = (char *)text;
+    out_event->timestamp_ms = now_ms;
+    out_event->session_policy = CLAW_EVENT_SESSION_POLICY_CHAT;
+    return ESP_OK;
+}
+
+static esp_err_t build_agent_out_message_event(const claw_core_request_t *request,
+                                               const claw_core_response_t *response,
+                                               claw_event_t *out_event,
+                                               char **out_payload_json)
+{
+    const char *channel = NULL;
+    const char *chat_id = NULL;
+    const char *text = NULL;
+    int64_t now_ms;
+    esp_err_t err;
+
+    if (!request || !response || !out_event || !out_payload_json) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     *out_payload_json = NULL;
+
+    text = (response->status == CLAW_CORE_RESPONSE_STATUS_OK) ?
+           response->text : response->error_message;
+    if (!text || !text[0]) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
     err = build_response_payload_json(request, response, out_payload_json);
     if (err != ESP_OK) {
@@ -393,15 +429,19 @@ static esp_err_t build_agent_response_event(const claw_core_request_t *request,
     chat_id = (response->target_chat_id && response->target_chat_id[0]) ?
               response->target_chat_id : request->source_chat_id;
 
-    snprintf(out_event->event_id, sizeof(out_event->event_id),
-             "agent-%" PRIu32 "-%" PRId64,
-             request->request_id,
-             now_ms);
-    strlcpy(out_event->source_cap, "claw_core", sizeof(out_event->source_cap));
-    strlcpy(out_event->event_type, "agent_response", sizeof(out_event->event_type));
-    strlcpy(out_event->source_channel, channel ? channel : "", sizeof(out_event->source_channel));
-    strlcpy(out_event->chat_id, chat_id ? chat_id : "", sizeof(out_event->chat_id));
-    strlcpy(out_event->content_type, "text", sizeof(out_event->content_type));
+    err = build_out_message_event_common("agent",
+                                         request->request_id,
+                                         now_ms,
+                                         channel,
+                                         chat_id,
+                                         text,
+                                         out_event);
+    if (err != ESP_OK) {
+        free(*out_payload_json);
+        *out_payload_json = NULL;
+        return err;
+    }
+
     snprintf(out_event->message_id, sizeof(out_event->message_id),
              "agent-%" PRIu32,
              request->request_id);
@@ -414,40 +454,33 @@ static esp_err_t build_agent_response_event(const claw_core_request_t *request,
                  "%" PRIu32,
                  request->request_id);
     }
-    out_event->timestamp_ms = now_ms;
-    out_event->session_policy = CLAW_EVENT_SESSION_POLICY_CHAT;
-    out_event->text = response->text;
     out_event->payload_json = *out_payload_json;
 
     return ESP_OK;
 }
 
-static void publish_response_event_if_requested(const claw_core_request_item_t *request,
-                                                const claw_core_response_item_t *response)
+static void publish_out_message_if_requested(const claw_core_request_item_t *request,
+                                             const claw_core_response_item_t *response)
 {
     claw_event_t event = {0};
     char *payload_json = NULL;
     esp_err_t err;
 
     if (!request || !response ||
-            !(request->view.flags & CLAW_CORE_REQUEST_FLAG_PUBLISH_RESPONSE_EVENT)) {
-        return;
-    }
-    if (response->view.status != CLAW_CORE_RESPONSE_STATUS_OK ||
-            !response->view.text || !response->view.text[0]) {
+            !(request->view.flags & CLAW_CORE_REQUEST_FLAG_PUBLISH_OUT_MESSAGE)) {
         return;
     }
 
-    err = build_agent_response_event(&request->view,
-                                     &response->view,
-                                     &event,
-                                     &payload_json);
+    err = build_agent_out_message_event(&request->view,
+                                        &response->view,
+                                        &event,
+                                        &payload_json);
     if (err == ESP_OK) {
         err = claw_event_router_publish(&event);
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG,
-                 "Failed to publish response event for request_id=%" PRIu32 ": %s",
+                 "Failed to publish out_message for request_id=%" PRIu32 ": %s",
                  request->view.request_id,
                  esp_err_to_name(err));
     }
@@ -458,31 +491,28 @@ static void publish_response_event_if_requested(const claw_core_request_item_t *
 static void publish_stage_event(const claw_core_request_t *request, const char *text)
 {
     claw_event_t event = {0};
-    const char *channel;
-    const char *chat_id;
     int64_t now_ms;
+    esp_err_t err;
 
     if (!request || !text || !text[0]) {
         return;
     }
-    channel = (request->target_channel && request->target_channel[0]) ?
-              request->target_channel : request->source_channel;
-    chat_id = (request->target_chat_id && request->target_chat_id[0]) ?
-              request->target_chat_id : request->source_chat_id;
-    if (!channel || !channel[0] || !chat_id || !chat_id[0]) {
+
+    now_ms = claw_core_now_ms();
+    err = build_out_message_event_common(
+        "stage",
+        request->request_id,
+        now_ms,
+        (request->target_channel && request->target_channel[0]) ?
+            request->target_channel : request->source_channel,
+        (request->target_chat_id && request->target_chat_id[0]) ?
+            request->target_chat_id : request->source_chat_id,
+        text,
+        &event);
+    if (err != ESP_OK) {
         return;
     }
 
-    now_ms = claw_core_now_ms();
-    snprintf(event.event_id, sizeof(event.event_id),
-             "stage-%" PRIu32 "-%" PRId64, request->request_id, now_ms);
-    strlcpy(event.source_cap, "claw_core", sizeof(event.source_cap));
-    strlcpy(event.event_type, "agent_stage", sizeof(event.event_type));
-    strlcpy(event.source_channel, channel, sizeof(event.source_channel));
-    strlcpy(event.chat_id, chat_id, sizeof(event.chat_id));
-    strlcpy(event.content_type, "text", sizeof(event.content_type));
-    event.text = (char *)text;
-    event.timestamp_ms = now_ms;
     esp_err_t pub_err = claw_event_router_publish(&event);
     if (pub_err != ESP_OK) {
         ESP_LOGW(TAG, "request=%" PRIu32 " failed to publish stage event: %s",
@@ -946,7 +976,7 @@ static esp_err_t build_iteration_context(const claw_core_request_item_t *request
             goto cleanup;
         }
         context_len = strlen(context.content);
-        ESP_LOGD(TAG,
+        ESP_LOGI(TAG,
                  "context_loaded request=%" PRIu32 " provider=%s context_kind=%s context_len=%u",
                  request->view.request_id,
                  provider->name,
@@ -1163,7 +1193,7 @@ finish_request:
                      request.view.request_id,
                      response.view.error_message ? response.view.error_message : esp_err_to_name(err));
         }
-        publish_response_event_if_requested(&request, &response);
+        publish_out_message_if_requested(&request, &response);
         if (request.view.flags & CLAW_CORE_REQUEST_FLAG_SKIP_RESPONSE_QUEUE) {
             free_response_item(&response);
         } else if (push_response(&response) != ESP_OK) {

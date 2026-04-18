@@ -137,6 +137,30 @@ const char *cap_im_attachment_ext_from_mime(const char *mime)
     if (strcmp(mime, "image/webp") == 0) {
         return ".webp";
     }
+    if (strcmp(mime, "audio/mpeg") == 0) {
+        return ".mp3";
+    }
+    if (strcmp(mime, "audio/mp3") == 0) {
+        return ".mp3";
+    }
+    if (strcmp(mime, "audio/wav") == 0 || strcmp(mime, "audio/x-wav") == 0) {
+        return ".wav";
+    }
+    if (strcmp(mime, "audio/ogg") == 0) {
+        return ".ogg";
+    }
+    if (strcmp(mime, "audio/aac") == 0) {
+        return ".aac";
+    }
+    if (strcmp(mime, "audio/amr") == 0) {
+        return ".amr";
+    }
+    if (strcmp(mime, "audio/silk") == 0) {
+        return ".silk";
+    }
+    if (strcmp(mime, "audio/mp4") == 0) {
+        return ".m4a";
+    }
     if (strcmp(mime, "application/pdf") == 0) {
         return ".pdf";
     }

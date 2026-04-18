@@ -7,6 +7,7 @@ releases/
 # ESP-IDF
 sdkconfig
 sdkconfig.old
+sdkconfig.bmgr_board.old
 dependencies.lock
 managed_components/
 

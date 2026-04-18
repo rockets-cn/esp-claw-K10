@@ -3,8 +3,7 @@
     {
       "id": "cap_im_feishu",
       "file": "cap_im_feishu.md",
-      "title": "cap_im_feishu",
-      "summary": "How to reply and send text, images, and files through Feishu capabilities.",
+      "summary": "How to send additional text, images, and files to Feishu.",
       "cap_groups": [
         "cap_im_feishu"
       ]

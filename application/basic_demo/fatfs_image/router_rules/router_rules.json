@@ -28,28 +28,6 @@
     ]
   },
   {
-    "id": "im_hello_esp_claw",
-    "description": "Intercept IM hello! ESP-Claw and reply directly.Just for demonstration",
-    "enabled": true,
-    "ack": "{{event.source_channel}} hello intercepted",
-    "match": {
-      "event_type": "message",
-      "event_key": "text",
-      "content_type": "text",
-      "text": "hello! ESP-Claw"
-    },
-    "actions": [
-      {
-        "type": "send_message",
-        "input": {
-          "channel": "{{event.source_channel}}",
-          "chat_id": "{{event.chat_id}}",
-          "message": "Nice to meet you!"
-        }
-      }
-    ]
-  },
-  {
     "id": "im_any_message_working_reply",
     "description": "Reply to any IM text message before other automation handling.",
     "enabled": true,
@@ -112,35 +90,14 @@
     ]
   },
   {
-    "id": "agent_stage_im_notify",
-    "description": "Forward agent stage updates to the originating IM chat.",
+    "id": "agent_out_message_send_message",
+    "description": "Deliver agent output messages to the original IM chat.",
     "enabled": true,
     "consume_on_match": true,
-    "ack": "agent stage notified via {{event.source_channel}}",
+    "ack": "{{event.source_channel}} agent output sent",
     "match": {
       "source_cap": "claw_core",
-      "event_type": "agent_stage"
-    },
-    "actions": [
-      {
-        "type": "send_message",
-        "input": {
-          "channel": "{{event.source_channel}}",
-          "chat_id": "{{event.chat_id}}",
-          "message": "{{event.text}}"
-        }
-      }
-    ]
-  },
-  {
-    "id": "agent_response_send_message",
-    "description": "Deliver final agent responses to the original IM chat.",
-    "enabled": true,
-    "consume_on_match": true,
-    "ack": "{{event.source_channel}} agent response sent",
-    "match": {
-      "source_cap": "claw_core",
-      "event_type": "agent_response",
+      "event_type": "out_message",
       "content_type": "text"
     },
     "actions": [

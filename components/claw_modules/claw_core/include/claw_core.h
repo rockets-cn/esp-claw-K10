@@ -25,8 +25,8 @@ typedef enum {
     CLAW_CORE_COMPLETION_DONE = 0,
 } claw_core_completion_type_t;
 
-#define CLAW_CORE_REQUEST_FLAG_PUBLISH_RESPONSE_EVENT (1U << 0)
-#define CLAW_CORE_REQUEST_FLAG_SKIP_RESPONSE_QUEUE    (1U << 1)
+#define CLAW_CORE_REQUEST_FLAG_PUBLISH_OUT_MESSAGE (1U << 0)
+#define CLAW_CORE_REQUEST_FLAG_SKIP_RESPONSE_QUEUE (1U << 1)
 
 typedef struct {
     uint32_t request_id;

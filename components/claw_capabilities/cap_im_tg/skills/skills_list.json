@@ -3,8 +3,7 @@
     {
       "id": "cap_im_tg",
       "file": "cap_im_tg.md",
-      "title": "cap_im_tg",
-      "summary": "How to reply and send text, images, and files through Telegram capabilities.",
+      "summary": "How to send additional text, images, and files to Telegram.",
       "cap_groups": [
         "cap_im_tg"
       ]

@@ -1427,7 +1427,7 @@ static esp_err_t claw_event_router_execute_agent_action(
     if (claw_event_router_build_session_id_with_config(&agent_event, session_id, sizeof(session_id)) > 0) {
         request.session_id = session_id;
     }
-    request.flags = CLAW_CORE_REQUEST_FLAG_PUBLISH_RESPONSE_EVENT |
+    request.flags = CLAW_CORE_REQUEST_FLAG_PUBLISH_OUT_MESSAGE |
                     CLAW_CORE_REQUEST_FLAG_SKIP_RESPONSE_QUEUE;
     request.user_text = (text && text[0]) ? text : (event->text ? event->text : "");
     request.source_channel = event->source_channel;

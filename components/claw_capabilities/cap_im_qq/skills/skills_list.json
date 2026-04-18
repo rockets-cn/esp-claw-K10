@@ -3,8 +3,7 @@
     {
       "id": "cap_im_qq",
       "file": "cap_im_qq.md",
-      "title": "cap_im_qq",
-      "summary": "Reply in the QQ conversation or send local files back to QQ",
+      "summary": "How to send additional text or send local files back to QQ.",
       "cap_groups": [
         "cap_im_qq"
       ]

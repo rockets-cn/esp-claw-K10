@@ -12,7 +12,6 @@
 
 #include "basic_demo_lua_modules.h"
 #include "basic_demo_wifi.h"
-#include "cap_cli.h"
 #include "cap_files.h"
 #include "cap_im_feishu.h"
 #include "cap_im_qq.h"
@@ -41,17 +40,13 @@
 static const char *TAG = "app_esp_claw";
 #if CONFIG_BASIC_DEMO_MEMORY_MODE_FULL
 static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
-    "cap_cli",
     "cap_files",
-    "cap_router_mgr",
     "cap_skill",
     "claw_memory",
 };
 #else
 static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
-    "cap_cli",
     "cap_files",
-    "cap_router_mgr",
     "cap_skill",
 };
 #endif
@@ -59,10 +54,10 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
 #define BASIC_DEMO_IM_ATTACHMENT_MAX_BYTES (2 * 1024 * 1024)
 
 #define BASIC_DEMO_SYSTEM_PROMPT_COMMON \
-    "You are the ESP-Claw running on ESP32. " \
+    "You are the ESP-Claw. " \
     "Answer briefly and plainly. " \
-    "Treat Skills List as a catalog of optional skills, not as callable cap. " \
-    "Use 'activate_skill' to load a skill,and you will gain more callable capabilities\n" \
+    "Treat Skills List as a catalog of optional skills." \
+    "Use 'activate_skill' to load a skill, and you will gain more callable capabilities\n" \
     "Skills are user-facing functions, while Capabilities are internal functions used by the model.\n" \
     "After completing the task, call 'deactivete_skill' to keep the context streamlined and efficient." \
     "When communicating with the user, refer to skills instead of Capabilities. " \
@@ -365,7 +360,7 @@ esp_err_t app_claw_start(const basic_demo_settings_t *settings)
     core_config.task_stack_size = 6 * 1024;
     core_config.task_priority = 5;
     core_config.task_core = tskNO_AFFINITY;
-    core_config.max_tool_iterations = 10;
+    core_config.max_tool_iterations = 20;
     core_config.request_queue_len = 4;
     core_config.response_queue_len = 4;
     core_config.max_context_providers = 6;
