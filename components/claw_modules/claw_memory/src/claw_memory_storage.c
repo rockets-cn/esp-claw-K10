@@ -737,7 +737,7 @@ esp_err_t claw_memory_export_markdown_internal(char **out_markdown,
     if (!items || items->count == 0) {
         off += snprintf(buf + off,
                         buf_size - off,
-                        "(empty - Clawgent will write memories here as it learns)\n");
+                        "(empty - Claw will write memories here as it learns)\n");
         *out_markdown = buf;
         return ESP_OK;
     }

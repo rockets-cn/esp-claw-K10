@@ -691,7 +691,7 @@ static esp_err_t load_active_skill_ids_from_disk(const char *session_id,
 
     err = read_file_dup(path, &json_text);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "read session %s: %s", session_id, esp_err_to_name(err));
+        ESP_LOGD(TAG, "read session %s: %s", session_id, esp_err_to_name(err));
         free(path);
         return err;
     }
