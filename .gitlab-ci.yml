@@ -7,6 +7,7 @@ spec:
 ---
 
 stages:
+  - pre-check
   - build
   - deploy
 
@@ -31,4 +32,5 @@ variables:
 
 include:
   - '.gitlab/ci/rules.yml'
+  - '.gitlab/ci/pre-check.yml'
   - '.gitlab/ci/build.yml'

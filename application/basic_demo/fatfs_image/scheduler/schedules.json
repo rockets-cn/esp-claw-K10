@@ -9,8 +9,8 @@
     "source_channel": "time",
     "content_type": "trigger",
     "session_policy": "trigger",
-    "text": "5 minute interval demo",
-    "payload_json": "{\"message\":\"interval tick every 5 minutes\",\"level\":\"info\"}",
+    "text": "1 minute interval demo",
+    "payload_json": "{\"message\":\"interval tick every 1 minute\",\"level\":\"info\"}",
     "max_runs": 0
   },
   {

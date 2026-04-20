@@ -71,6 +71,9 @@
 .patterns-yml: &patterns-yml
   - "**/*.yml"
 
+.patterns-docs: &patterns-docs
+  - "docs/**/*"
+
 ##############
 # if anchors #
 ##############
@@ -147,3 +150,11 @@
       changes: *patterns-components_claw_skill
     - <<: *if-dev-push
       changes: *patterns-application_basic_demo
+
+.rules:pre_check:docs:
+  rules:
+    - <<: *if-protected
+    - <<: *if-label-pre_check
+    - <<: *if-trigger-job
+    - <<: *if-dev-push
+      changes: *patterns-docs

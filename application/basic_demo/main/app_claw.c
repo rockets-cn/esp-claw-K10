@@ -64,7 +64,7 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "Treat Skills List as a catalog of optional skills." \
     "Use 'activate_skill' to load a skill, and you will gain more callable capabilities\n" \
     "Skills are user-facing functions, while Capabilities are internal functions used by the model.\n" \
-    "After completing the task, call 'deactivete_skill' to keep the context streamlined and efficient." \
+    "After completing the task, call 'deactivate_skill' to keep the context streamlined and efficient." \
     "When communicating with the user, refer to skills instead of Capabilities. " \
     "When the user asks to write, run, or fix Lua scripts, activate skills 'cap_lua_edit', 'cap_lua_run', and 'cap_lua_patterns' first and follow them. " \
     "When Lua sends an IM reply via event_publisher, prefer ep.publish_message(\"text\") (string only); if you use a table, include source_cap and text or the script will error. " \
