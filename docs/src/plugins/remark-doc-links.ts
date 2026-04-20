@@ -54,13 +54,23 @@ import type { VFile } from 'vfile';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Astro injects its resolved config here during the remark pipeline. */
+/** Options accepted by the remarkDocLinks plugin. */
+export interface RemarkDocLinksOptions {
+  /**
+   * The Astro `base` path (e.g. `"/esp-claw/"`).
+   * Pass `config.base` from `astro.config.mjs` directly so the plugin is
+   * always in sync with the Astro config.
+   * Falls back to the `ASTRO_BASE` env variable, then `/`.
+   */
+  base?: string;
+}
+
+/**
+ * @deprecated Astro does NOT inject `config` into `file.data.astro` during
+ * the remark pipeline – only frontmatter lands there.  Kept for reference.
+ */
 interface AstroVFileData {
-  astro?: {
-    config?: {
-      base?: string;
-    };
-  };
+  astro?: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,18 +129,19 @@ function resolveAlias(url: string, locale: string, base: string): string {
 // Plugin
 // ---------------------------------------------------------------------------
 
-// `Plugin<[], any>` — the `any` tree type is intentional: the standard
-// `Root` type from @types/mdast does not include MDX extension node types
-// (mdxJsxFlowElement, mdxJsxTextElement), so restricting to `Root` would
-// cause spurious TS errors.  The runtime tree is still a valid mdast Root.
-export const remarkDocLinks: Plugin<[], any> = () => {
+// `Plugin<[RemarkDocLinksOptions?], any>` — the `any` tree type is intentional:
+// the standard `Root` type from @types/mdast does not include MDX extension
+// node types (mdxJsxFlowElement, mdxJsxTextElement), so restricting to `Root`
+// would cause spurious TS errors.  The runtime tree is still a valid mdast Root.
+export const remarkDocLinks: Plugin<[RemarkDocLinksOptions?], any> = (
+  options = {}
+) => {
   return (tree: Root, file: VFile) => {
     // ── Derive base ────────────────────────────────────────────────────────
-    const fileData = file.data as AstroVFileData;
-    const rawBase =
-      fileData?.astro?.config?.base ??
-      process.env.ASTRO_BASE ??
-      '/';
+    // Priority: plugin options → ASTRO_BASE env var → "/"
+    // NOTE: file.data.astro contains frontmatter, NOT the Astro config, so
+    // reading config.base from there does not work.
+    const rawBase = options?.base ?? process.env.ASTRO_BASE ?? '/';
     const base = normaliseBase(rawBase);
 
     // ── Derive locale ──────────────────────────────────────────────────────

@@ -7,8 +7,10 @@ import starlightThemeNova from "starlight-theme-nova";
 import astroD2 from "astro-d2";
 import { remarkDocLinks } from "./src/plugins/remark-doc-links.ts";
 
+const BASE = "/esp-claw/";
+
 export default defineConfig({
-  base: "/esp-claw/",
+  base: BASE,
   integrations: [
     astroD2(),
     starlight({
@@ -93,7 +95,7 @@ export default defineConfig({
     }),
   ],
   markdown: {
-    remarkPlugins: [remarkDocLinks],
+    remarkPlugins: [[remarkDocLinks, { base: BASE }]],
   },
   vite: {
     resolve: {

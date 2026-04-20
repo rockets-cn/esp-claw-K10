@@ -75,34 +75,3 @@ build_application_basic_demo:
         EXAMPLE_TARGET: esp32s3
   variables:
     EXAMPLE_DIR: application/basic_demo
-
-collect_firmware_manifest:
-  stage: deploy
-  tags:
-    - build
-  image: python:3.13-slim
-  variables:
-    GIT_STRATEGY: fetch
-  rules:
-    - if: '$CI_COMMIT_REF_NAME == "master" && $CI_PIPELINE_SOURCE == "push"'
-      when: on_success
-      variables:
-        DEPLOY_FIRMWARE: "1"
-    - if: '$CI_COMMIT_REF_NAME != "master" && $CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: on_success
-      variables:
-        DEPLOY_FIRMWARE: "0"
-    - when: never
-  needs:
-    - job: build_application_basic_demo
-      artifacts: true
-  script:
-    - python .gitlab/ci/generate_firmware_json.py
-    - |
-      echo "DEPLOY_FIRMWARE: $DEPLOY_FIRMWARE"
-  artifacts:
-    when: always
-    paths:
-      - firmware.json
-      - merged_binary/**/*
-    expire_in: 1 week

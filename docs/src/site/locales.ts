@@ -6,9 +6,10 @@ export const SITE_LOCALES: { id: Lang; label: string }[] = [
 ];
 
 export function localeHref(lang: Lang, pagePath: string): string {
+  const base = (import.meta.env.BASE_URL ?? "/").replace(/\/+$/, "");
   const p = pagePath.replace(/^\/+|\/+$/g, "");
-  if (!p) return `/${lang}/`;
-  return `/${lang}/${p}/`;
+  if (!p) return `${base}/${lang}/`;
+  return `${base}/${lang}/${p}/`;
 }
 
 export function htmlLangAttribute(lang: Lang): string {
