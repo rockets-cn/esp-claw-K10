@@ -16,13 +16,12 @@
 
 - **Chat Coding:** Ordinary users can define device behavior through IM chat + dynamic Lua loading, without traditional programming
 - **Event-driven:** Any event can trigger the Agent Loop and other actions, not just user messages
-- **Lua runtime:** Lets the LLM actively plan hardware logic, and generated logic can be persisted as local deterministic rules
 - **Structured memory management:** Organizes memories so they can accumulate and stay useful over time, with privacy kept local
 - **MCP communication:** Supports both standard MCP devices and traditional IoT hardware, with dual Server/Client identities
 - **Ready out of the box:** Fast configuration through Board Manager with one-click flashing
 - **Modularized:** Every module can be included or trimmed on demand
 
-![claw](docs/src/assets/images/claw_run.svg)
+![breadboard-photo](docs/src/assets/images/claw-breadboard-photo.jpg)
 
 ## Why ESP-Claw: From Cloud-Centric to Edge AI
 

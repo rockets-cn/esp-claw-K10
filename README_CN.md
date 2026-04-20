@@ -16,13 +16,12 @@
 
 - **Chat Coding：** 通过 IM 聊天 + Lua 动态加载，普通用户即可定义设备行为，无需编程
 - **事件驱动：** 可由任意事件触发 Agent Loop 和其他动作，而不只是用户消息
-- **Lua 运行时：** 由 LLM 主动规划硬件功能，生成的逻辑可固化为本地确定性规则
 - **结构化记忆管理：** 有条理地沉淀记忆内容，隐私不上云
 - **MCP 通讯：** 支持标准 MCP 设备与传统 IoT 设备接入，设备具备 Server/Client 双重身份
 - **开箱即用：** 基于 Board Manager 快速配置，并提供一键烧录
 - **组件化：** 所有模块均可按需裁剪
 
-![claw](docs/src/assets/images/claw_run.svg)
+![breadboard-photo](docs/src/assets/images/claw-breadboard-photo.jpg)
 
 ## 为什么 ESP-Claw：从云中心化到边缘 AI
 
