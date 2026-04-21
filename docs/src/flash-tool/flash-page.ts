@@ -38,7 +38,7 @@ async function stopEsptoolReadLoop(t: InstanceType<typeof Transport> | null) {
   }
 }
 
-let chipInfo: { chipName: string; flashSizeMB: number } | null = null;
+let chipInfo: { chipName: string; flashSizeMB: number; psramSizeMB: number | null } | null = null;
 let selectedFirmware: FirmwareEntry | null = null;
 /** True while ESPLoader's readLoop is expected to be running (connect / flash tab). */
 let esptoolReadLoopRunning = false;
@@ -61,9 +61,11 @@ const statusBadge = document.getElementById("status-badge") as HTMLSpanElement;
 const statusText = document.getElementById("status-text") as HTMLSpanElement;
 const infoChip = document.getElementById("info-chip") as HTMLSpanElement;
 const infoFlash = document.getElementById("info-flash") as HTMLSpanElement;
+const infoPsram = document.getElementById("info-psram") as HTMLSpanElement;
+const infoPsramSep = document.getElementById("info-psram-sep") as HTMLSpanElement;
 const firmwareGrid = document.getElementById("firmware-grid") as HTMLDivElement;
 const firmwareDesc = document.getElementById("firmware-desc") as HTMLDivElement;
-const noFirmwareMsg = document.getElementById("no-firmware-msg") as HTMLParagraphElement;
+const noFirmwareCard = document.getElementById("no-firmware-card") as HTMLDivElement;
 const configForm = document.getElementById("config-form") as HTMLDivElement;
 const flashBtn = document.getElementById("flash-btn") as HTMLButtonElement;
 const flashHint = document.getElementById("flash-hint") as HTMLSpanElement;
@@ -889,7 +891,7 @@ connectBtn.addEventListener("click", async () => {
 
     loader = new ESPLoader({
       transport,
-      baudrate: 921600,
+      baudrate: 460800,
       terminal,
       debugLogging: false,
     });
@@ -903,12 +905,39 @@ connectBtn.addEventListener("click", async () => {
       flashSizeMB = m ? parseInt(m[1]!, 10) : 0;
     } catch {}
 
-    chipInfo = { chipName: rawChipName, flashSizeMB };
+    // Detect PSRAM from the chip's feature list. The ROM driver returns
+    // entries like "Embedded PSRAM 8MB"; external PSRAM can't be detected
+    // this way, so treat "no match" as unknown (null) instead of zero to
+    // avoid accidentally filtering out valid firmware entries.
+    let psramSizeMB: number | null = null;
+    try {
+      const features = await loader.chip.getChipFeatures(loader);
+      for (const feat of features) {
+        const m = feat.match(/PSRAM\s+(\d+)\s*MB/i);
+        if (m) {
+          psramSizeMB = parseInt(m[1]!, 10);
+          break;
+        }
+      }
+    } catch {}
+
+    chipInfo = { chipName: rawChipName, flashSizeMB, psramSizeMB };
 
     statusBadge.className = "status-badge connected";
-    statusText.textContent = s.connectedTo + " · " + rawChipName;
+    statusText.textContent = s.connectedTo;
     infoChip.textContent = rawChipName;
-    infoFlash.textContent = flashSizeMB + " MB";
+    infoChip.style.display = "";
+    infoFlash.textContent = `Flash ${flashSizeMB} MB`;
+    infoFlash.style.display = "";
+    if (psramSizeMB !== null) {
+      infoPsram.textContent = `PSRAM ${psramSizeMB} MB`;
+      infoPsram.style.display = "";
+      infoPsramSep.style.display = "";
+    } else {
+      infoPsram.textContent = s.psramUnknown;
+      infoPsram.style.display = "";
+      infoPsramSep.style.display = "";
+    }
 
     connectBarIdle.style.display = "none";
     connectBarActive.style.display = "flex";
@@ -922,7 +951,7 @@ connectBtn.addEventListener("click", async () => {
     setConsoleInputsEnabled(true);
     updateConsoleTabEnabled();
 
-    populateFirmware(rawChipName, flashSizeMB);
+    populateFirmware(rawChipName, flashSizeMB, psramSizeMB);
     updateFlashBtn();
   } catch (err) {
     connectBtn.disabled = false;
@@ -973,17 +1002,22 @@ disconnectBtn.addEventListener("click", async () => {
   configForm.style.display = "none";
   configForm.classList.remove("config-revealed");
   firmwareDesc.classList.remove("visible");
+  noFirmwareCard.style.display = "none";
+  infoChip.style.display = "none";
+  infoFlash.style.display = "none";
+  infoPsram.style.display = "none";
+  infoPsramSep.style.display = "none";
   updateFlashBtn();
 });
 
-function populateFirmware(chipName: string, flashSizeMB: number) {
-  const list = getFirmwareList(firmwareDb, chipName, flashSizeMB);
+function populateFirmware(chipName: string, flashSizeMB: number, psramSizeMB: number | null) {
+  const list = getFirmwareList(firmwareDb, chipName, flashSizeMB, psramSizeMB);
   firmwareGrid.innerHTML = "";
   firmwareDesc.classList.remove("visible");
-  noFirmwareMsg.style.display = "none";
+  noFirmwareCard.style.display = "none";
 
   if (!list.length) {
-    noFirmwareMsg.style.display = "block";
+    noFirmwareCard.style.display = "flex";
     return;
   }
 
@@ -993,9 +1027,12 @@ function populateFirmware(chipName: string, flashSizeMB: number) {
     card.dataset.idx = String(idx);
 
     const tags = fw.features.map((f) => `<span class="fw-tag">${f}</span>`).join("");
+    const psramReq = fw.min_psram_size ?? 0;
+    const metaParts = [`Flash ≥ ${fw.min_flash_size} MB`];
+    if (psramReq > 0) metaParts.push(`PSRAM ≥ ${psramReq} MB`);
     card.innerHTML = `
       <div class="fw-board">${fw.board}</div>
-      <div class="fw-meta">Flash ≥ ${fw.min_flash_size} MB</div>
+      <div class="fw-meta">${metaParts.join(" · ")}</div>
       ${tags ? `<div class="fw-features">${tags}</div>` : ""}
     `;
     card.addEventListener("click", () => selectFirmware(fw, card));

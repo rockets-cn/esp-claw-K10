@@ -32,6 +32,7 @@ export default defineConfig({
           },
           items: [
             { slug: "tutorial", label: "Welcome", translations: { en: "Welcome", "zh-CN": "欢迎" } }, // `index.mdx`
+            { slug: "tutorial/supported-list" },
             { slug: "tutorial/bom" },
             { slug: "tutorial/assemble" },
             { slug: "tutorial/get-started" },

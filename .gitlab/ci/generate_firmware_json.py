@@ -114,6 +114,7 @@ def main() -> int:
             'description': '',
             'merged_binary': _join_base_url(base_url, merged_binary),
             'min_flash_size': min_flash_mb,
+            'min_psram_size': 8,
             'nvs_info': {
                 'start_addr': str(nvs_info.get('start_addr', '')),
                 'size': str(nvs_info.get('size', '')),

@@ -4,8 +4,9 @@
       "board": "esp32_S3_DevKitC_1",
       "features": [],
       "description": "",
-      "merged_binary": "/esp32_S3_DevKitC_1__65225c1.bin",
+      "merged_binary": "/esp-claw/esp32_S3_DevKitC_1__65225c1.bin",
       "min_flash_size": 8,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"
@@ -15,8 +16,9 @@
       "board": "esp32_S3_DevKitC_1_breadboard",
       "features": [],
       "description": "",
-      "merged_binary": "/esp32_S3_DevKitC_1_breadboard__65225c1.bin",
+      "merged_binary": "/esp-claw/esp32_S3_DevKitC_1_breadboard__65225c1.bin",
       "min_flash_size": 8,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"
@@ -26,8 +28,9 @@
       "board": "esp_vocat_board_v1_2",
       "features": [],
       "description": "",
-      "merged_binary": "/esp_vocat_board_v1_2__65225c1.bin",
+      "merged_binary": "/esp-claw/esp_vocat_board_v1_2__65225c1.bin",
       "min_flash_size": 16,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"
@@ -39,8 +42,9 @@
       "board": "esp32_p4_function_ev",
       "features": [],
       "description": "",
-      "merged_binary": "/esp32_p4_function_ev__65225c1.bin",
+      "merged_binary": "/esp-claw/esp32_p4_function_ev__65225c1.bin",
       "min_flash_size": 16,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"
@@ -52,8 +56,9 @@
       "board": "esp_SensairHalo",
       "features": [],
       "description": "",
-      "merged_binary": "/esp_SensairHalo__65225c1.bin",
+      "merged_binary": "/esp-claw/esp_SensairHalo__65225c1.bin",
       "min_flash_size": 16,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"
@@ -63,8 +68,9 @@
       "board": "esp_SensairShuttle",
       "features": [],
       "description": "",
-      "merged_binary": "/esp_SensairShuttle__65225c1.bin",
+      "merged_binary": "/esp-claw/esp_SensairShuttle__65225c1.bin",
       "min_flash_size": 16,
+      "min_psram_size": 8,
       "nvs_info": {
         "start_addr": "0x9000",
         "size": "0x6000"

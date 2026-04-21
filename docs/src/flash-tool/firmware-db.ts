@@ -9,6 +9,8 @@ export interface FirmwareEntry {
   description: string;
   merged_binary: string;
   min_flash_size: number; // MB
+  /** Minimum PSRAM size required, in MB. `0` or omitted means no PSRAM required. */
+  min_psram_size?: number;
   nvs_info: NvsInfo;
 }
 
@@ -36,12 +38,24 @@ function normalizeChipTarget(chipTarget: string): string {
 export function getFirmwareList(
   db: FirmwareDb,
   chipTarget: string,
-  flashSizeMB: number
+  flashSizeMB: number,
+  /** Detected PSRAM size in MB. `null` / `undefined` means unknown (skip PSRAM check). */
+  psramSizeMB?: number | null
 ): FirmwareEntry[] {
   // Normalize chip target: e.g. "ESP32-S3 (QFN56) (revision v0.2)" => "esp32s3"
   const key = normalizeChipTarget(chipTarget);
   const list = db[key] ?? [];
-  return list.filter((fw) => flashSizeMB >= fw.min_flash_size);
+  return list.filter((fw) => {
+    if (flashSizeMB < fw.min_flash_size) return false;
+    const requiredPsram = fw.min_psram_size ?? 0;
+    // Only enforce PSRAM limit when we confidently detected a size. When
+    // PSRAM is unknown (e.g. external PSRAM that can't be read from eFuse),
+    // we let the firmware be selected and rely on the user to verify.
+    if (requiredPsram > 0 && typeof psramSizeMB === "number" && psramSizeMB < requiredPsram) {
+      return false;
+    }
+    return true;
+  });
 }
 
 /** Parse a hex or decimal string like "0x9000" or "36864" into a number */

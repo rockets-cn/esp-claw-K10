@@ -19,6 +19,10 @@ export interface Strings {
   // Firmware & Config (inside Flash tab)
   step2Title: string;
   noFirmwareMatch: string;
+  noFirmwareTitle: string;
+  noFirmwareDesc: string;
+  viewSupportedBoardsBtn: string;
+  psramUnknown: string;
   // Required – Basic
   sectionBasic: string;
   sectionWifi: string;
@@ -114,6 +118,11 @@ const en: Strings = {
   step2Title: "Select Firmware",
   noFirmwareMatch:
     "No firmware available for this chip / flash size combination.",
+  noFirmwareTitle: "No compatible firmware found",
+  noFirmwareDesc:
+    "We couldn't find firmware matching your chip, flash size, or PSRAM. Your board may not be supported yet — check the full list below.",
+  viewSupportedBoardsBtn: "View supported chips & boards",
+  psramUnknown: "PSRAM: unknown",
   sectionBasic: "Basic Settings",
   sectionWifi: "Wi-Fi Configuration",
   wifiSsidLabel: "Wi-Fi SSID",
@@ -129,8 +138,8 @@ const en: Strings = {
   llmOptionAnthropicCompat: "Claude-compatible API",
   llmGetApiKeyBtn: "Get API Key",
   llmVendorDocsBtn: "Vendor Docs",
-  llmBaseUrlLabel: "API base URL (will add /v1/chat/completions path automatically)",
-  llmBaseUrlLabelAnthropicCompat: "API base URL (will add /v1/messages path automatically)",
+  llmBaseUrlLabel: "API base URL (will add /chat/completions path automatically)",
+  llmBaseUrlLabelAnthropicCompat: "API base URL (will add /messages path automatically)",
   llmModelLabel: "LLM Model",
   llmApiKeyLabel: "API Key",
   sectionIm: "Instant messaging (IM)",
@@ -206,6 +215,11 @@ const zhCn: Strings = {
 
   step2Title: "选择固件",
   noFirmwareMatch: "当前芯片/Flash 大小没有匹配的固件。",
+  noFirmwareTitle: "未找到匹配的固件",
+  noFirmwareDesc:
+    "当前芯片、Flash 容量或 PSRAM 没有匹配的固件，您的开发板可能暂未被支持。请查看下方的支持列表了解更多信息。",
+  viewSupportedBoardsBtn: "查看支持的芯片 & 开发板",
+  psramUnknown: "PSRAM: 未知",
   sectionBasic: "基本设置",
   sectionWifi: "Wi-Fi 配置",
   wifiSsidLabel: "Wi-Fi 名称 (SSID)",
@@ -221,8 +235,8 @@ const zhCn: Strings = {
   llmOptionAnthropicCompat: "Claude 兼容 API",
   llmGetApiKeyBtn: "获取 API Key",
   llmVendorDocsBtn: "厂商文档",
-  llmBaseUrlLabel: "API Base URL (会自动添加 /v1/chat/completions 路径)",
-  llmBaseUrlLabelAnthropicCompat: "API Base URL (会自动添加 /v1/messages 路径)",
+  llmBaseUrlLabel: "API Base URL (会自动添加 /chat/completions 路径)",
+  llmBaseUrlLabelAnthropicCompat: "API Base URL (会自动添加 /messages 路径)",
   llmModelLabel: "LLM 模型",
   llmApiKeyLabel: "API 密钥",
   sectionIm: "即时通讯 (IM)",

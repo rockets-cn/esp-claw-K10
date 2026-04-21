@@ -36,7 +36,7 @@ let _transport: Transport | null = null;
 let _loader: ESPLoader | null = null;
 let _consoleActive = false;
 
-const BAUD_RATE = 921600;
+const BAUD_RATE = 460800;
 
 // ─── Terminal adapter ─────────────────────────────────────────────────────────
 

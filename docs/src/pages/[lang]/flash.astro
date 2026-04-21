@@ -17,8 +17,8 @@ export function getStaticPaths() {
 const { lang } = Astro.params as { lang: Lang };
 const s = getStrings(lang);
 const chrome = getChromeStrings(lang);
-const tutorialHref = localeHref(lang, "tutorial/get-started");
-const boardsHref = "https://github.com/espressif/esp-claw/tree/master/application/basic_demo/boards";
+const tutorialHref = localeHref(lang, "tutorial/");
+const boardsHref = localeHref(lang, "tutorial/supported-list");
 
 const quickLinks = [
   {
@@ -844,6 +844,53 @@ const flashBootJson = JSON.stringify({
       display: block;
     }
 
+    .no-firmware-card {
+      margin-top: 0.5rem;
+      padding: 2rem 1.5rem;
+      background: var(--bg-surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-lg);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .no-firmware-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 1px solid var(--border-accent);
+      color: var(--accent-soft);
+      margin-bottom: 0.35rem;
+    }
+    .no-firmware-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+    .no-firmware-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .no-firmware-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      max-width: 440px;
+      margin: 0 auto;
+    }
+    .no-firmware-btn {
+      margin-top: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -1075,6 +1122,10 @@ const flashBootJson = JSON.stringify({
           <span class="device-meta-item" id="info-flash" style="display: none;"
             >—</span
           >
+          <span class="device-meta-sep" id="info-psram-sep" style="display: none;">·</span>
+          <span class="device-meta-item" id="info-psram" style="display: none;"
+            >—</span
+          >
         </div>
         <button class="btn-secondary" id="disconnect-btn">
           <Unplug class="button-icon" />
@@ -1098,12 +1149,26 @@ const flashBootJson = JSON.stringify({
         <div class="section-label flash-tab-section">{s.step2Title}</div>
         <div class="firmware-grid" id="firmware-grid"></div>
         <div class="firmware-desc" id="firmware-desc"></div>
-        <p
-          id="no-firmware-msg"
-          style="display:none; color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem;"
-        >
-          {s.noFirmwareMatch}
-        </p>
+        <div class="no-firmware-card" id="no-firmware-card" style="display:none;">
+          <div class="no-firmware-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div class="no-firmware-title">{s.noFirmwareTitle}</div>
+          <div class="no-firmware-desc">{s.noFirmwareDesc}</div>
+          <a
+            href={boardsHref}
+            class="btn-primary no-firmware-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {s.viewSupportedBoardsBtn}
+            <span aria-hidden="true" style="margin-left:0.25rem;">↗</span>
+          </a>
+        </div>
 
         <div id="config-form" style="display:none; margin-top: 2rem;">
           <div class="config-section">
