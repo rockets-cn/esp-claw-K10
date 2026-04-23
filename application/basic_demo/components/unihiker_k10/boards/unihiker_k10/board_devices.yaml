@@ -36,21 +36,13 @@ devices:
       - name: spi_display
 
   - name: audio_dac
-    chip: internal
-    type: audio_codec
+    type: custom
     version: default
-    init_skip: true
+    dependencies:
+      espressif/esp_codec_dev: "*"
     config:
-      adc_enabled: false
-      dac_enabled: true
-      dac_max_channel: 1
-      dac_channel_mask: "1"
-      dac_init_gain: 0
-      mclk_enabled: false
+      sample_rate_hz: 24000
     peripherals:
-      - name: gpio_audio_dummy_pa
-        gain: 0
-        active_level: 1
       - name: i2s_audio_out
 
   - name: audio_adc

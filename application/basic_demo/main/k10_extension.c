@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "driver/i2c_master.h"
+#include "dev_camera.h"
 #include "esp_board_manager.h"
 #include "esp_board_manager_includes.h"
 #include "esp_check.h"
@@ -32,6 +33,7 @@
 #define K10_EXPANDER_ADDR ESP_IO_EXPANDER_I2C_TCA9555_ADDRESS_000
 #define K10_LCD_BACKLIGHT IO_EXPANDER_PIN_NUM_0
 #define K10_CAMERA_RESET  IO_EXPANDER_PIN_NUM_1
+#define K10_AMP_GAIN      IO_EXPANDER_PIN_NUM_15
 
 #define K10_RGB_GPIO 46
 #define K10_RGB_COUNT 3
@@ -96,9 +98,11 @@ static esp_err_t k10_io_expander_ensure(void)
     ESP_RETURN_ON_ERROR(esp_io_expander_new_i2c_tca95xx_16bit(s_state.i2c_bus, K10_EXPANDER_ADDR,
                                                               &s_state.io_expander),
                         TAG, "Failed to create IO expander");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_state.io_expander, K10_LCD_BACKLIGHT | K10_CAMERA_RESET,
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_state.io_expander, K10_LCD_BACKLIGHT | K10_CAMERA_RESET | K10_AMP_GAIN,
                                                 IO_EXPANDER_OUTPUT),
                         TAG, "Failed to set IO expander direction");
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_state.io_expander, K10_AMP_GAIN, 0),
+                        TAG, "Failed to set amplifier gain");
     return ESP_OK;
 }
 
@@ -293,6 +297,25 @@ static void k10_log_device_handle(const char *name)
     }
 }
 
+static void k10_probe_camera(void)
+{
+    dev_camera_handle_t *camera = NULL;
+    esp_err_t err = esp_board_manager_init_device_by_name(K10_CAMERA_NAME);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "camera init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = esp_board_manager_get_device_handle(K10_CAMERA_NAME, (void **)&camera);
+    if (err != ESP_OK || camera == NULL) {
+        ESP_LOGW(TAG, "camera handle unavailable: %s", esp_err_to_name(err));
+        return;
+    }
+    ESP_LOGI(TAG, "camera ready: dev_path=%s meta_path=%s",
+             camera->dev_path ? camera->dev_path : "(none)",
+             camera->meta_path ? camera->meta_path : "(none)");
+}
+
 esp_err_t k10_extension_init(void)
 {
     float humidity = 0.0f;
@@ -304,7 +327,7 @@ esp_err_t k10_extension_init(void)
 
     ESP_RETURN_ON_ERROR(k10_rgb_init(), TAG, "Failed to init RGB strip");
     ESP_RETURN_ON_ERROR(k10_camera_reset_pulse(), TAG, "Failed to reset camera");
-    ESP_LOGI(TAG, "Camera left in reset-released state; initialize '%s' on demand", K10_CAMERA_NAME);
+    k10_probe_camera();
 
     if (k10_aht20_sample(&humidity, &temperature_c) == ESP_OK) {
         ESP_LOGI(TAG, "AHT20 temperature=%.2fC humidity=%.2f%%RH", temperature_c, humidity);
@@ -317,7 +340,11 @@ esp_err_t k10_extension_init(void)
                  accel_id, accel_xyz[0], accel_xyz[1], accel_xyz[2]);
     }
 
+    if (esp_board_manager_init_device_by_name(K10_AUDIO_DAC_NAME) != ESP_OK) {
+        ESP_LOGW(TAG, "audio_dac init failed; continuing without audio output");
+    }
     k10_log_device_handle(K10_AUDIO_ADC_NAME);
+    k10_log_device_handle(K10_AUDIO_DAC_NAME);
     k10_release_probe_resources();
     return ESP_OK;
 }

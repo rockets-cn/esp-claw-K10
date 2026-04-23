@@ -163,7 +163,15 @@ class CInitializerParser:
             self.index += 1
         if start == self.index:
             fail('Expected designator name in C initializer')
-        return self.text[start:self.index]
+        key = self.text[start:self.index]
+        while self._peek() == '[':
+            bracket_start = self.index
+            self._consume('[')
+            while self._peek() not in {']', None}:
+                self.index += 1
+            self._consume(']')
+            key += self.text[bracket_start:self.index]
+        return key
 
     def _parse_string(self) -> str:
         self._consume('"')

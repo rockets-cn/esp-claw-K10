@@ -18,6 +18,7 @@
 #define K10_EXPANDER_ADDR ESP_IO_EXPANDER_I2C_TCA9555_ADDRESS_000
 #define K10_LCD_BACKLIGHT IO_EXPANDER_PIN_NUM_0
 #define K10_CAMERA_RESET  IO_EXPANDER_PIN_NUM_1
+#define K10_AMP_GAIN      IO_EXPANDER_PIN_NUM_15
 
 static esp_io_expander_handle_t s_io_expander;
 
@@ -32,9 +33,11 @@ static esp_err_t k10_io_expander_ensure_ready(void)
                         TAG, "Failed to get board I2C bus");
     ESP_RETURN_ON_ERROR(esp_io_expander_new_i2c_tca95xx_16bit(i2c_bus, K10_EXPANDER_ADDR, &s_io_expander),
                         TAG, "Failed to create IO expander");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_io_expander, K10_LCD_BACKLIGHT | K10_CAMERA_RESET,
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_io_expander, K10_LCD_BACKLIGHT | K10_CAMERA_RESET | K10_AMP_GAIN,
                                                 IO_EXPANDER_OUTPUT),
                         TAG, "Failed to set IO expander direction");
+    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_io_expander, K10_AMP_GAIN, 0),
+                        TAG, "Failed to set amplifier gain");
     return ESP_OK;
 }
 
