@@ -7,18 +7,23 @@
 
 #include <inttypes.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/queue.h>
 
+#include "dev_audio_codec.h"
 #include "driver/i2c_master.h"
 #include "dev_camera.h"
 #include "esp_board_manager.h"
 #include "esp_board_manager_includes.h"
 #include "esp_check.h"
+#include "esp_codec_dev.h"
 #include "esp_err.h"
 #include "esp_io_expander_tca95xx_16bit.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "linux/videodev2.h"
 #include "led_strip.h"
 #include "led_strip_rmt.h"
 #include "led_strip_types.h"
@@ -29,6 +34,12 @@
 #define K10_CAMERA_NAME "camera"
 #define K10_AUDIO_ADC_NAME "audio_adc"
 #define K10_AUDIO_DAC_NAME "audio_dac"
+#define K10_DVP_VIDEO_OBJECT_NAME "DVP"
+
+#define K10_CAMERA_CAPTURE_TIMEOUT_MS 3000
+#define K10_CAMERA_BUFFER_COUNT 3
+#define K10_AUDIO_CHUNK_BYTES 512
+#define K10_AUDIO_TONE_VOLUME 100
 
 #define K10_EXPANDER_ADDR ESP_IO_EXPANDER_I2C_TCA9555_ADDRESS_000
 #define K10_LCD_BACKLIGHT IO_EXPANDER_PIN_NUM_0
@@ -51,6 +62,53 @@
 #define SC7A20H_REG_CTRL1 0x20
 #define SC7A20H_REG_CTRL4 0x23
 #define SC7A20H_REG_OUT_X_L 0x28
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixel_format;
+    char pixel_format_str[5];
+} k10_camera_stream_info_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixel_format;
+    char pixel_format_str[5];
+    size_t frame_bytes;
+    int64_t timestamp_us;
+} k10_camera_frame_info_t;
+
+typedef TAILQ_ENTRY(k10_esp_video_buffer_element) k10_esp_video_buffer_node_t;
+
+struct esp_video;
+struct k10_esp_video_buffer;
+
+typedef struct k10_esp_video_buffer_element {
+    bool free;
+    k10_esp_video_buffer_node_t node;
+    struct k10_esp_video_buffer *video_buffer;
+    uint32_t index;
+    uint8_t *buffer;
+    uint32_t valid_size;
+    void *priv_data;
+} k10_esp_video_buffer_element_t;
+
+esp_err_t camera_open(const char *dev_path);
+esp_err_t camera_get_stream_info(k10_camera_stream_info_t *out_info);
+esp_err_t camera_capture_jpeg(int timeout_ms, uint8_t **jpeg_data, size_t *jpeg_bytes,
+                              k10_camera_frame_info_t *out_info);
+esp_err_t camera_close(void);
+void camera_free_buffer(void *buffer);
+esp_err_t esp_video_open(const char *name, struct esp_video **video_ret);
+esp_err_t esp_video_close(struct esp_video *video);
+esp_err_t esp_video_get_format(struct esp_video *video, struct v4l2_format *format);
+esp_err_t esp_video_setup_buffer(struct esp_video *video, uint32_t type, uint32_t memory_type, uint32_t count);
+esp_err_t esp_video_start_capture(struct esp_video *video, uint32_t type);
+esp_err_t esp_video_stop_capture(struct esp_video *video, uint32_t type);
+esp_err_t esp_video_queue_element_index(struct esp_video *video, uint32_t type, int index);
+k10_esp_video_buffer_element_t *esp_video_recv_element(struct esp_video *video, uint32_t type, uint32_t ticks);
+esp_err_t esp_video_done_element(struct esp_video *video, uint32_t type, k10_esp_video_buffer_element_t *element);
 
 typedef struct {
     i2c_master_bus_handle_t i2c_bus;
@@ -316,6 +374,357 @@ static void k10_probe_camera(void)
              camera->meta_path ? camera->meta_path : "(none)");
 }
 
+static void k10_verify_camera_capture(void)
+{
+    dev_camera_handle_t *camera = NULL;
+    k10_camera_stream_info_t stream_info = {0};
+    k10_camera_frame_info_t frame_info = {0};
+    uint8_t *jpeg_data = NULL;
+    size_t jpeg_bytes = 0;
+    esp_err_t err = esp_board_manager_get_device_handle(K10_CAMERA_NAME, (void **)&camera);
+
+    if (err != ESP_OK || camera == NULL || camera->dev_path == NULL) {
+        ESP_LOGW(TAG, "camera capture skipped: handle unavailable: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = camera_open(camera->dev_path);
+    if (err == ESP_OK) {
+        err = camera_get_stream_info(&stream_info);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera stream info failed: %s", esp_err_to_name(err));
+            goto cleanup_vfs;
+        }
+
+        ESP_LOGI(TAG, "camera stream verified: %ux%u format=%s",
+                 stream_info.width, stream_info.height, stream_info.pixel_format_str);
+
+        err = camera_capture_jpeg(K10_CAMERA_CAPTURE_TIMEOUT_MS, &jpeg_data, &jpeg_bytes, &frame_info);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera frame capture failed: %s", esp_err_to_name(err));
+            goto cleanup_vfs;
+        }
+
+        ESP_LOGI(TAG,
+                 "camera frame captured via VFS: jpeg_bytes=%u frame=%ux%u format=%s raw_bytes=%u timestamp_us=%" PRId64,
+                 (unsigned int)jpeg_bytes,
+                 frame_info.width,
+                 frame_info.height,
+                 frame_info.pixel_format_str,
+                 (unsigned int)frame_info.frame_bytes,
+                 frame_info.timestamp_us);
+        goto cleanup_vfs;
+    }
+
+    ESP_LOGW(TAG, "camera VFS capture unavailable (%s), trying direct esp_video path",
+             esp_err_to_name(err));
+
+    {
+        struct esp_video *video = NULL;
+        k10_esp_video_buffer_element_t *element = NULL;
+        struct v4l2_format format = {
+            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+        };
+        bool started = false;
+
+        err = esp_video_open(K10_DVP_VIDEO_OBJECT_NAME, &video);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera direct open failed: %s", esp_err_to_name(err));
+            return;
+        }
+
+        err = esp_video_get_format(video, &format);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera direct get_format failed: %s", esp_err_to_name(err));
+            goto cleanup_direct;
+        }
+
+        err = esp_video_setup_buffer(video, format.type, V4L2_MEMORY_MMAP, K10_CAMERA_BUFFER_COUNT);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera direct setup_buffer failed: %s", esp_err_to_name(err));
+            goto cleanup_direct;
+        }
+
+        for (int i = 0; i < K10_CAMERA_BUFFER_COUNT; ++i) {
+            err = esp_video_queue_element_index(video, format.type, i);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "camera direct queue buffer %d failed: %s", i, esp_err_to_name(err));
+                goto cleanup_direct;
+            }
+        }
+
+        err = esp_video_start_capture(video, format.type);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "camera direct start_capture failed: %s", esp_err_to_name(err));
+            goto cleanup_direct;
+        }
+        started = true;
+
+        element = esp_video_recv_element(video, format.type, pdMS_TO_TICKS(K10_CAMERA_CAPTURE_TIMEOUT_MS));
+        if (element == NULL) {
+            ESP_LOGW(TAG, "camera direct receive frame timed out");
+            err = ESP_ERR_TIMEOUT;
+            goto cleanup_direct;
+        }
+
+        ESP_LOGI(TAG,
+                 "camera frame captured via esp_video: bytes=%u frame=%ux%u pixfmt=0x%08" PRIx32 " buffer_index=%u",
+                 (unsigned int)element->valid_size,
+                 format.fmt.pix.width,
+                 format.fmt.pix.height,
+                 format.fmt.pix.pixelformat,
+                 element->index);
+
+cleanup_direct:
+        if (element != NULL) {
+            esp_err_t done_err = esp_video_done_element(video, format.type, element);
+            if (done_err != ESP_OK) {
+                ESP_LOGW(TAG, "camera direct done_element failed: %s", esp_err_to_name(done_err));
+            }
+        }
+        if (started) {
+            esp_err_t stop_err = esp_video_stop_capture(video, format.type);
+            if (stop_err != ESP_OK) {
+                ESP_LOGW(TAG, "camera direct stop_capture failed: %s", esp_err_to_name(stop_err));
+            }
+        }
+        esp_err_t close_err = esp_video_close(video);
+        if (close_err != ESP_OK) {
+            ESP_LOGW(TAG, "camera direct close failed: %s", esp_err_to_name(close_err));
+        }
+    }
+
+cleanup_vfs:
+    if (jpeg_data != NULL) {
+        camera_free_buffer(jpeg_data);
+    }
+    err = camera_close();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "camera close failed after capture test: %s", esp_err_to_name(err));
+    }
+}
+
+static void k10_camera_capture_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(2500));
+    k10_verify_camera_capture();
+    vTaskDelete(NULL);
+}
+
+static esp_err_t k10_get_i2s_audio_format(const periph_i2s_config_t *i2s_cfg,
+                                          uint32_t *sample_rate,
+                                          uint8_t *channels,
+                                          uint8_t *bits_per_sample)
+{
+    if (i2s_cfg == NULL || sample_rate == NULL || channels == NULL || bits_per_sample == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (i2s_cfg->mode == I2S_COMM_MODE_STD) {
+        *sample_rate = i2s_cfg->i2s_cfg.std.clk_cfg.sample_rate_hz;
+        *channels = (i2s_cfg->i2s_cfg.std.slot_cfg.slot_mode == I2S_SLOT_MODE_STEREO) ? 2 : 1;
+        *bits_per_sample = (uint8_t)i2s_cfg->i2s_cfg.std.slot_cfg.data_bit_width;
+        return ESP_OK;
+    }
+
+#if CONFIG_SOC_I2S_SUPPORTS_TDM
+    if (i2s_cfg->mode == I2S_COMM_MODE_TDM) {
+        *sample_rate = i2s_cfg->i2s_cfg.tdm.clk_cfg.sample_rate_hz;
+        *channels = (uint8_t)i2s_cfg->i2s_cfg.tdm.slot_cfg.total_slot;
+        *bits_per_sample = (uint8_t)i2s_cfg->i2s_cfg.tdm.slot_cfg.data_bit_width;
+        return ESP_OK;
+    }
+#endif
+
+#if CONFIG_SOC_I2S_SUPPORTS_PDM_TX
+    if (i2s_cfg->mode == I2S_COMM_MODE_PDM && (i2s_cfg->direction & I2S_DIR_TX)) {
+        *sample_rate = i2s_cfg->i2s_cfg.pdm_tx.clk_cfg.sample_rate_hz;
+        *channels = (i2s_cfg->i2s_cfg.pdm_tx.slot_cfg.slot_mode == I2S_SLOT_MODE_STEREO) ? 2 : 1;
+        *bits_per_sample = (uint8_t)i2s_cfg->i2s_cfg.pdm_tx.slot_cfg.data_bit_width;
+        return ESP_OK;
+    }
+#endif
+
+#if CONFIG_SOC_I2S_SUPPORTS_PDM_RX
+    if (i2s_cfg->mode == I2S_COMM_MODE_PDM && (i2s_cfg->direction & I2S_DIR_RX)) {
+        *sample_rate = i2s_cfg->i2s_cfg.pdm_rx.clk_cfg.sample_rate_hz;
+        *channels = (i2s_cfg->i2s_cfg.pdm_rx.slot_cfg.slot_mode == I2S_SLOT_MODE_STEREO) ? 2 : 1;
+        *bits_per_sample = (uint8_t)i2s_cfg->i2s_cfg.pdm_rx.slot_cfg.data_bit_width;
+        return ESP_OK;
+    }
+#endif
+
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+static esp_err_t k10_play_audio_tone(esp_codec_dev_handle_t codec_dev,
+                                     uint32_t sample_rate,
+                                     uint8_t channels,
+                                     uint8_t bits_per_sample,
+                                     uint32_t freq_hz,
+                                     uint32_t duration_ms,
+                                     int volume_pct)
+{
+    uint8_t bytes_per_sample = (uint8_t)(bits_per_sample / 8);
+    uint32_t chunk_frames = 0;
+    uint32_t total_frames = 0;
+    uint32_t frames_written = 0;
+    float gain_scale = 0.0f;
+    float amplitude = 0.0f;
+    float phase = 0.0f;
+    float phase_step = 0.0f;
+    int16_t *buf = NULL;
+
+    if (codec_dev == NULL || sample_rate == 0 || channels == 0 || bits_per_sample != 16 ||
+        bytes_per_sample != sizeof(int16_t)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (freq_hz >= sample_rate / 2) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    chunk_frames = K10_AUDIO_CHUNK_BYTES / (channels * bytes_per_sample);
+    if (chunk_frames == 0) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    total_frames = (uint32_t)(((uint64_t)sample_rate * duration_ms) / 1000);
+
+    if (volume_pct > 0) {
+        float gain_db = ((float)volume_pct - 100.0f) * 0.5f;
+        gain_scale = powf(10.0f, gain_db / 20.0f);
+    }
+    amplitude = 32767.0f * gain_scale;
+    phase_step = 2.0f * (float)M_PI * (float)freq_hz / (float)sample_rate;
+
+    buf = (int16_t *)malloc(chunk_frames * channels * sizeof(int16_t));
+    if (buf == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    while (frames_written < total_frames) {
+        uint32_t frames_this_chunk = total_frames - frames_written;
+        if (frames_this_chunk > chunk_frames) {
+            frames_this_chunk = chunk_frames;
+        }
+
+        for (uint32_t i = 0; i < frames_this_chunk; ++i) {
+            int16_t sample = (int16_t)(sinf(phase) * amplitude);
+            for (uint8_t ch = 0; ch < channels; ++ch) {
+                buf[i * channels + ch] = sample;
+            }
+            phase += phase_step;
+            if (phase >= 2.0f * (float)M_PI) {
+                phase -= 2.0f * (float)M_PI;
+            }
+        }
+
+        if (esp_codec_dev_write(codec_dev, buf,
+                                (int)(frames_this_chunk * channels * sizeof(int16_t))) != ESP_CODEC_DEV_OK) {
+            free(buf);
+            return ESP_FAIL;
+        }
+        frames_written += frames_this_chunk;
+    }
+
+    free(buf);
+    return ESP_OK;
+}
+
+static void k10_verify_audio_output(void)
+{
+    dev_audio_codec_handles_t *codec_handles = NULL;
+    dev_audio_codec_config_t *codec_cfg = NULL;
+    periph_i2s_config_t *i2s_cfg = NULL;
+    esp_codec_dev_sample_info_t sample_info = {0};
+    void *config = NULL;
+    void *periph_config = NULL;
+    uint32_t sample_rate = 0;
+    uint8_t channels = 0;
+    uint8_t bits_per_sample = 0;
+    esp_err_t err;
+    int ret;
+
+    err = esp_board_manager_init_device_by_name(K10_AUDIO_DAC_NAME);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "audio output test skipped: init failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = esp_board_manager_get_device_handle(K10_AUDIO_DAC_NAME, (void **)&codec_handles);
+    if (err != ESP_OK || codec_handles == NULL || codec_handles->codec_dev == NULL) {
+        ESP_LOGW(TAG, "audio output test skipped: handle unavailable: %s", esp_err_to_name(err));
+        return;
+    }
+
+    err = esp_board_manager_get_device_config(K10_AUDIO_DAC_NAME, &config);
+    if (err != ESP_OK || config == NULL) {
+        ESP_LOGW(TAG, "audio output test skipped: config unavailable: %s", esp_err_to_name(err));
+        return;
+    }
+    codec_cfg = (dev_audio_codec_config_t *)config;
+    if (!codec_cfg->dac_enabled || codec_cfg->i2s_cfg.name == NULL) {
+        ESP_LOGW(TAG, "audio output test skipped: invalid DAC config");
+        return;
+    }
+
+    err = esp_board_manager_get_periph_config(codec_cfg->i2s_cfg.name, &periph_config);
+    if (err != ESP_OK || periph_config == NULL) {
+        ESP_LOGW(TAG, "audio output test skipped: periph config unavailable: %s", esp_err_to_name(err));
+        return;
+    }
+    i2s_cfg = (periph_i2s_config_t *)periph_config;
+    err = k10_get_i2s_audio_format(i2s_cfg, &sample_rate, &channels, &bits_per_sample);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "audio output test skipped: unsupported I2S format: %s", esp_err_to_name(err));
+        return;
+    }
+
+    sample_info.sample_rate = sample_rate;
+    sample_info.channel = channels;
+    sample_info.bits_per_sample = bits_per_sample;
+    ret = esp_codec_dev_open(codec_handles->codec_dev, &sample_info);
+    if (ret != ESP_CODEC_DEV_OK) {
+        ESP_LOGW(TAG, "audio output open failed: ret=%d", ret);
+        return;
+    }
+
+    ret = esp_codec_dev_set_out_vol(codec_handles->codec_dev, K10_AUDIO_TONE_VOLUME);
+    if (ret != ESP_CODEC_DEV_OK && ret != ESP_CODEC_DEV_NOT_SUPPORT) {
+        ESP_LOGW(TAG, "audio output set volume failed: ret=%d", ret);
+        goto cleanup;
+    }
+
+    ESP_LOGI(TAG, "audio output verified: sample_rate=%" PRIu32 " channels=%u bits=%u",
+             sample_rate, channels, bits_per_sample);
+
+    err = k10_play_audio_tone(codec_handles->codec_dev, sample_rate, channels, bits_per_sample,
+                              523, 180, K10_AUDIO_TONE_VOLUME);
+    if (err == ESP_OK) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        err = k10_play_audio_tone(codec_handles->codec_dev, sample_rate, channels, bits_per_sample,
+                                  659, 180, K10_AUDIO_TONE_VOLUME);
+    }
+    if (err == ESP_OK) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        err = k10_play_audio_tone(codec_handles->codec_dev, sample_rate, channels, bits_per_sample,
+                                  784, 240, K10_AUDIO_TONE_VOLUME);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "audio tone sequence failed: %s", esp_err_to_name(err));
+        goto cleanup;
+    }
+
+    ESP_LOGI(TAG, "audio tone sequence submitted successfully");
+    vTaskDelay(pdMS_TO_TICKS(300));
+
+cleanup:
+    ret = esp_codec_dev_close(codec_handles->codec_dev);
+    if (ret != ESP_CODEC_DEV_OK) {
+        ESP_LOGW(TAG, "audio output close failed: ret=%d", ret);
+    }
+}
+
 esp_err_t k10_extension_init(void)
 {
     float humidity = 0.0f;
@@ -328,6 +737,9 @@ esp_err_t k10_extension_init(void)
     ESP_RETURN_ON_ERROR(k10_rgb_init(), TAG, "Failed to init RGB strip");
     ESP_RETURN_ON_ERROR(k10_camera_reset_pulse(), TAG, "Failed to reset camera");
     k10_probe_camera();
+    if (xTaskCreate(k10_camera_capture_task, "k10_cam_chk", 6144, NULL, 4, NULL) != pdPASS) {
+        ESP_LOGW(TAG, "failed to create deferred camera capture task");
+    }
 
     if (k10_aht20_sample(&humidity, &temperature_c) == ESP_OK) {
         ESP_LOGI(TAG, "AHT20 temperature=%.2fC humidity=%.2f%%RH", temperature_c, humidity);
@@ -345,6 +757,7 @@ esp_err_t k10_extension_init(void)
     }
     k10_log_device_handle(K10_AUDIO_ADC_NAME);
     k10_log_device_handle(K10_AUDIO_DAC_NAME);
+    k10_verify_audio_output();
     k10_release_probe_resources();
     return ESP_OK;
 }
