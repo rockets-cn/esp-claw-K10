@@ -72,6 +72,13 @@ menu "App Claw Config"
                 Enable the WeChat capability and keep app_claw's direct dependency
                 on cap_im_wechat.
 
+        config APP_CLAW_CAP_IM_LOCAL
+            bool "Enable local / Web IM capability (cap_im_local)"
+            depends on APP_CLAW_CAP_SESSION_MGR
+            default y
+            help
+                Register cap_im_local for in-process IM (e.g. edge_agent Web IM). Requires session manager for roll_chat_session.
+
         config APP_CLAW_CAP_SCHEDULER
             bool "Enable scheduler capability"
             default y

@@ -42,6 +42,10 @@ if(CONFIG_APP_CLAW_CAP_IM_WECHAT)
     list(APPEND app_claw_requires cap_im_wechat)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_IM_LOCAL)
+    list(APPEND app_claw_requires cap_im_local)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LLM_INSPECT)
     list(APPEND app_claw_requires cap_llm_inspect)
 endif()

@@ -17,6 +17,7 @@
 #include "esp_err.h"
 #include "esp_board_manager_includes.h"
 #include "captive_dns.h"
+#include "cmd_wifi.h"
 #if CONFIG_APP_CLAW_CAP_IM_WECHAT
 #include "cap_im_wechat.h"
 #endif
@@ -353,6 +354,11 @@ void app_main(void)
 
     ESP_ERROR_CHECK(app_claw_init_storage_paths(s_claw_paths));
     ESP_ERROR_CHECK(app_claw_start(s_claw_config, s_claw_paths));
+#if CONFIG_APP_CLAW_CAP_IM_LOCAL
+    ESP_ERROR_CHECK(http_server_webim_bind_im());
+#endif
+
+    register_wifi_command();
 
 #if APP_ENABLE_MEM_LOG
     /* Start memory monitor: print internal free, min free, PSRAM free every 20s */

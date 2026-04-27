@@ -4,6 +4,10 @@
 
 ### Feature:
 
+* Refactored the Web Config interface:
+  * Introduced support for fine-grained configuration controls 
+  * Added a basic online chat module.
+
 * Added the `edge_agent` demo application with Wi-Fi setup, HTTP management UI, FATFS image content, Lua script examples, skill assets, router rules, scheduler rules, and partition defaults.
 
 * Added shared application components for Claw capability wiring, CLI support, Lua module registration, captive DNS, display arbitration, emote rendering, settings storage, and Wi-Fi management.
