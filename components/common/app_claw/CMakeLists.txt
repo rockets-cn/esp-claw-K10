@@ -106,6 +106,10 @@ if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_TOUCH)
     list(APPEND app_claw_requires lua_module_touch)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_IR)
+    list(APPEND app_claw_requires lua_module_ir)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_CAPABILITY)
     list(APPEND app_claw_requires lua_module_call_capability)
 endif()
