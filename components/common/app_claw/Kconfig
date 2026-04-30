@@ -265,6 +265,14 @@ menu "App Claw Config"
                 Enable the I2C Lua module and keep app_claw's direct dependency
                 on lua_module_i2c when Lua capability is enabled.
 
+        config APP_CLAW_LUA_MODULE_SCI
+            bool "Enable DFRobot SCI Lua module"
+            default y
+            help
+                Enable the DFRobot RP2040 SCI Acquisition Module Lua module and
+                keep app_claw's direct dependency on lua_module_sci when Lua
+                capability is enabled.
+
         config APP_CLAW_LUA_MODULE_SSD1306
             bool "Enable SSD1306 Lua module"
             default y

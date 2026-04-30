@@ -31,6 +31,9 @@
 #if CONFIG_APP_CLAW_LUA_MODULE_I2C
 #include "lua_module_i2c.h"
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_SCI
+#include "lua_module_sci.h"
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
 #include "lua_module_led_strip.h"
 #endif
@@ -251,6 +254,14 @@ static esp_err_t app_lua_register_i2c(const char *fatfs_base_path)
 }
 #endif
 
+#if CONFIG_APP_CLAW_LUA_MODULE_SCI
+static esp_err_t app_lua_register_sci(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_module_sci_register();
+}
+#endif
+
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
 static esp_err_t app_lua_register_led_strip(const char *fatfs_base_path)
 {
@@ -397,6 +408,9 @@ static const app_lua_module_entry_t s_lua_module_entries[] = {
 #if CONFIG_APP_CLAW_LUA_MODULE_I2C
     { "i2c", "I2C", app_lua_register_i2c },
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_SCI
+    { "sci", "DFRobot SCI", app_lua_register_sci },
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
     { "led_strip", "LED Strip", app_lua_register_led_strip },
 #endif
@@ -465,6 +479,9 @@ static const app_lua_module_info_t s_lua_module_infos[] = {
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_I2C
     { "i2c", "I2C" },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_SCI
+    { "sci", "DFRobot SCI" },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
     { "led_strip", "LED Strip" },

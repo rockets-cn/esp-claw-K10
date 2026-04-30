@@ -150,6 +150,10 @@ if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_I2C)
     list(APPEND app_claw_requires lua_module_i2c)
 endif()
 
+if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_SCI)
+    list(APPEND app_claw_requires lua_module_sci)
+endif()
+
 if(CONFIG_APP_CLAW_CAP_LUA AND CONFIG_APP_CLAW_LUA_MODULE_SSD1306)
     list(APPEND app_claw_requires lua_module_ssd1306)
 endif()

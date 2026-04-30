@@ -214,6 +214,12 @@ dependencies:
       - if: $CONFIG{APP_CLAW_LUA_MODULE_I2C} == True
     path: ../../lua_modules/lua_module_i2c
 
+  lua_module_sci:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+      - if: $CONFIG{APP_CLAW_LUA_MODULE_SCI} == True
+    path: ../../lua_modules/lua_module_sci
+
   lua_module_ssd1306:
     rules:
       - if: $CONFIG{APP_CLAW_CAP_LUA} == True
