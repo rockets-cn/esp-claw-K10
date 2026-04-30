@@ -45,7 +45,7 @@ export interface NvsConfig {
   wifi_ssid: string;
   wifi_password: string;
   time_timezone: string;
-  // Required - LLM (matches basic_demo_settings.c)
+  // Required - LLM (matches edge_agent app_config.c)
   llm_backend_type: string;
   llm_profile: string;
   llm_model: string;
@@ -274,7 +274,7 @@ function buildStringEntries(nsIndex: number, key: string, value: string): Uint8A
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Generate an ESP-IDF NVS v2 binary partition for the "basic_demo" namespace.
+ * Generate an ESP-IDF NVS v2 binary partition for the edge_agent "app" namespace.
  *
  * @param config     - Key-value NVS configuration
  * @param partitionSize - Byte size of the NVS partition (from nvs_info.size)
@@ -292,9 +292,9 @@ export function generateNvsPartition(
     if (s) pairs.push([k, s]);
   };
 
-  // Key names MUST match basic_demo_settings.c exactly. NVS keys are capped at
-  // 15 chars, so the firmware uses shortened names (llm_backend, feishu_secret,
-  // brave_key, tavily_key) that we have to mirror here.
+  // Key names MUST match application/edge_agent/components/app_config/app_config.c exactly.
+  // NVS keys are capped at 15 chars, so shortened names such as llm_backend,
+  // feishu_secret, brave_key, and tavily_key must be mirrored here.
   add("wifi_ssid",       config.wifi_ssid);
   add("wifi_password",   config.wifi_password);
   add("time_timezone",   config.time_timezone);
@@ -313,7 +313,7 @@ export function generateNvsPartition(
   add("brave_key",       config.search_brave_key);
   add("tavily_key",      config.search_tavily_key);
 
-  const NS_NAME = "basic_demo";
+  const NS_NAME = "app";
   const NS_ID   = 1;
 
   // Build all entries (namespace def + data entries)
