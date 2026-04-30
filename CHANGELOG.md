@@ -1,5 +1,28 @@
 # ChangeLog
 
+## 2026-04-30
+
+### Feature:
+
+* Added `esp_SensairShuttle` board support for `edge_agent`, including board metadata, peripheral definitions, default board config, and device setup wiring.
+
+* Added shared `app_claw` integration for the new Lua environmental sensor and magnetometer modules, including Kconfig, component dependencies, and Lua module registration.
+
+* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and a `basic_environmental_sensor.lua` example script.
+
+* Added the `lua_module_magnetometer` module with bundled `bmm350` driver sources, Lua bindings, example scripts, and skill metadata.
+
+* Renamed the `lua_module_bq27220` module to the more generic `lua_module_fuel_gauge`, and refreshed its Lua examples, helper library, and skill docs.
+
+* Added `esp32_p4_eye` board support for `edge_agent`, including board device/peripheral definitions, board defaults, CI build coverage, and early board bring-up for camera, SD power, and LCD panel initialization.
+
+* Added shared `app_claw` support for `lua_module_knob`, including Kconfig and dependency wiring, Lua module registration, a basic rotary encoder demo script, and the related skill metadata.
+
+### Change:
+
+* Removed the deprecated `application/basic_demo` app and its CI/build rules.
+
+
 ## 2026-04-29
 
 ### Feature:

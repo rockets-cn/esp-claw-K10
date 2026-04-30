@@ -43,6 +43,9 @@
 #if CONFIG_APP_CLAW_LUA_MODULE_BUTTON
 #include "lua_module_button.h"
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_KNOB
+#include "lua_module_knob.h"
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP
 #include "lua_module_esp_heap.h"
 #endif
@@ -54,6 +57,12 @@
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IMU
 #include "lua_module_imu.h"
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
+#include "lua_module_magnetometer.h"
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+#include "lua_module_environmental_sensor.h"
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_TOUCH
 #include "lua_module_touch.h"
@@ -285,6 +294,14 @@ static esp_err_t app_lua_register_button(const char *fatfs_base_path)
 }
 #endif
 
+#if CONFIG_APP_CLAW_LUA_MODULE_KNOB
+static esp_err_t app_lua_register_knob(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_module_knob_register();
+}
+#endif
+
 #if CONFIG_APP_CLAW_LUA_MODULE_ESP_HEAP
 static esp_err_t app_lua_register_esp_heap(const char *fatfs_base_path)
 {
@@ -314,6 +331,22 @@ static esp_err_t app_lua_register_imu(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_imu_register();
+}
+#endif
+
+#if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
+static esp_err_t app_lua_register_magnetometer(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_module_magnetometer_register();
+}
+#endif
+
+#if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+static esp_err_t app_lua_register_environmental_sensor(const char *fatfs_base_path)
+{
+    (void)fatfs_base_path;
+    return lua_module_environmental_sensor_register();
 }
 #endif
 
@@ -420,6 +453,9 @@ static const app_lua_module_entry_t s_lua_module_entries[] = {
 #if CONFIG_APP_CLAW_LUA_MODULE_BUTTON
     { "button", "Button", app_lua_register_button },
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_KNOB
+    { "knob", "Knob", app_lua_register_knob },
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_DISPLAY
     { "display", "Display", app_lua_register_display },
 #endif
@@ -431,6 +467,12 @@ static const app_lua_module_entry_t s_lua_module_entries[] = {
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IMU
     { "imu", "IMU", app_lua_register_imu },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
+    { "magnetometer", "Magnetometer", app_lua_register_magnetometer },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+    { "environmental_sensor", "Environmental Sensor", app_lua_register_environmental_sensor },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_TOUCH
     { "touch", "Touch", app_lua_register_touch },
@@ -492,6 +534,9 @@ static const app_lua_module_info_t s_lua_module_infos[] = {
 #if CONFIG_APP_CLAW_LUA_MODULE_BUTTON
     { "button", "Button" },
 #endif
+#if CONFIG_APP_CLAW_LUA_MODULE_KNOB
+    { "knob", "Knob" },
+#endif
 #if CONFIG_APP_CLAW_LUA_MODULE_DISPLAY
     { "display", "Display" },
 #endif
@@ -503,6 +548,12 @@ static const app_lua_module_info_t s_lua_module_infos[] = {
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IMU
     { "imu", "IMU" },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
+    { "magnetometer", "Magnetometer" },
+#endif
+#if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+    { "environmental_sensor", "Environmental Sensor" },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_TOUCH
     { "touch", "Touch" },
